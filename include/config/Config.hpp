@@ -1,8 +1,8 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
 
-#include <vector>
 #include "ServerConfig.hpp"
+#include <vector>
 
 /*
     Config
@@ -20,6 +20,8 @@
 
 class Config {
 public:
+    Config(std::string& filename);
+
     std::vector<ServerConfig> servers;
 };
 

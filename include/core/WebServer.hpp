@@ -18,8 +18,21 @@
 */
 
 class WebServer {
+
+private:
+    WebServer();
+    WebServer(const WebServer& other);
+    WebServer& operator=(const WebServer& other);
+
+    bool _running;
+
+    static void sigintHandler(int signal);
+
 public:
-    WebServer(const Config& config);
+    ~WebServer();
+
+    static WebServer& getInstance();
+    void appliConfig(Config& config);
     void run();
 };
 
