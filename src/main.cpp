@@ -1,23 +1,25 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
+#include <cstdlib>
+#include <iostream>
+
+#include "../include/config/Config.hpp"
+#include "../include/core/WebServer.hpp"
 
 int main(int argc, char* argv[])
 {
-    int info;
-    struct addrinfo hints;
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-    hints.ai_flags = AI_PASSIVE; /* For wildcard IP address */
-    hints.ai_protocol = 0; /* Any protocol */
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
+    std::string filename(argv[1]);
+    Config config = Config(filename);
 
-    info = getaddrinfo(NULL, argv[1], &hints);
+    WebServer& webServer = WebServer::getInstance();
+    webServer.appliConfig(config);
+
+    webServer.run();
+
+    (void)argc;
+    (void)argv;
+    return EXIT_SUCCESS;
 }

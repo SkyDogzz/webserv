@@ -18,7 +18,7 @@ SRC_PATH := src/
 
 OBJ_PATH := obj/
 
-SRC := main.cpp \
+SRC := $(shell find $(SRC_PATH) -type f -name "*.cpp" -printf "%P\n")
 
 SRCS := $(addprefix $(SRC_PATH), $(SRC))
 OBJS := $(addprefix $(OBJ_PATH), $(SRC:.cpp=.o))
@@ -41,6 +41,5 @@ fclean: clean
 	rm -f $(NAME)
 
 re: fclean all
-
 
 .PHONY: all clean fclean re
