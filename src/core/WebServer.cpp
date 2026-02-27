@@ -25,9 +25,6 @@ WebServer& WebServer::getInstance()
 
 void WebServer::appliConfig(Config& config) { (void)config; }
 
-void WebServer::run()
-{
-    while (_running) {
-        std::cout << "doing things" << std::endl;
-    }
-}
+void WebServer::run() { _event_loop.run(); }
+
+bool WebServer::isRunning() { return _running; }

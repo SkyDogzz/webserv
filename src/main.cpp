@@ -11,13 +11,17 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    std::string filename(argv[1]);
-    Config config = Config(filename);
+    try {
+        std::string filename(argv[1]);
+        Config config = Config(filename);
 
-    WebServer& webServer = WebServer::getInstance();
-    webServer.appliConfig(config);
+        WebServer& webServer = WebServer::getInstance();
+        webServer.appliConfig(config);
 
-    webServer.run();
+        webServer.run();
+    } catch (std::exception& e) {
+        std::cerr << "Unknown exception throwed: " << e.what() << std::endl;
+    }
 
     (void)argc;
     (void)argv;
