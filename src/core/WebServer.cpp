@@ -28,6 +28,6 @@ void WebServer::appliConfig(Config& config) { (void)config; }
 void WebServer::run()
 {
     while (_running) {
-        std::cout << "doing things" << std::endl;
+        //std::cout << "doing things" << std::endl;
     }
 }

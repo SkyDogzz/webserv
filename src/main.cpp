@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "../include/config/Config.hpp"
+#include "../src/config/lexer.hpp"
 #include "../include/core/WebServer.hpp"
 
 int main(int argc, char* argv[])
@@ -13,7 +14,8 @@ int main(int argc, char* argv[])
 
     std::string filename(argv[1]);
     Config config = Config(filename);
-
+	
+	Lexer lexer(argv[1]);
     WebServer& webServer = WebServer::getInstance();
     webServer.appliConfig(config);
 

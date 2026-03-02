@@ -1,6 +1,9 @@
 #ifndef LEXER_HPP
 # define LEXER_HPP
 
+# include <string>
+# include <iostream>
+
 enum TokenType {
 	TOK_LBRACE,
 	TOK_RBRACE,
@@ -25,8 +28,13 @@ class Lexer
 {
 public:
 	Lexer(const char *input);
+	void readFile(const char *filename);
 	Token getNextToken();
+	Token handleString();
 private:
+	std::string	_content;
 	const char	*_start;
 	const char	*_index;
 };
+
+#endif
