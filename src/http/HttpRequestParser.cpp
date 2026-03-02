@@ -56,7 +56,7 @@ void printRequest(HttpRequest& request)
     std::cout << "Headers" << std::endl;
     std::map<std::string, std::string>::iterator it;
     for (it = request.headers.begin(); it != request.headers.end(); it++) {
-        std::cout << it->first << ':' << it->second << std::endl;
+        std::cout << it->first << " :" << it->second << std::endl;
     }
     std::cout << std::endl;
 
@@ -73,28 +73,29 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
     if (!parseStartLine(line, request))
         throw HttpRequestParser::FirstLineInvalidException();
     std::size_t start = pos + 1;
+    std::size_t body_start = buffer.size();
     while (start <= buffer.size()) {
         std::size_t end = buffer.find('\n', start);
         std::string header_line = buffer.substr(start, end - start);
-        if (header_line == "" || header_line == "\r")
+        if (header_line == "" || header_line == "\r") {
+            if (end == std::string::npos)
+                body_start = buffer.size();
+            else
+                body_start = end + 1;
             break;
+        }
         pushHeader(header_line, request);
-        if (end == std::string::npos)
+        if (end == std::string::npos) {
+            body_start = buffer.size();
             break;
+        }
         start = end + 1;
     }
-    start = pos + 1;
-    while (start <= buffer.size()) {
-        std::size_t end = buffer.find('\n', start);
-        std::string body_line = buffer.substr(start, end - start);
-        if (body_line == "" || body_line == "\r")
-            break;
-        request.body += body_line;
-        if (end == std::string::npos)
-            break;
-        start = end + 1;
+    if (body_start < buffer.size()) {
+        request.body = buffer.substr(body_start);
+        if (!request.body.empty() && request.body[0] == '\r')
+            request.body.erase(0, 1);
     }
-    start = pos + 1;
     printRequest(request);
     return true;
 }
