@@ -1,9 +1,8 @@
 NAME := webserv
 CC := g++
-CFLAGS := -Wall -Wextra -Werror -Wunused-function -MMD -MP -Ofast
+CFLAGS := -Wall -Wextra -Werror -Wunused-function -std=c++98 -MMD -MP -Ofast
 LDFLAGS :=
 INCLUDES := -I ./include
-
 
 ifdef DEBUG
 	CFLAGS += -g3
