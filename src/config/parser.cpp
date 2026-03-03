@@ -11,14 +11,13 @@ void	Parser::getNextToken(TokenType type)
 		_currentToken = _lexer.getNextToken();
 	else
 		std::cerr << "Unexpected token: " << _currentToken.value << std::endl;
-	
 }
 
 JsonValue	*Parser::parseValue()
 {
 	switch (_currentToken.type)
 	{
-		case TOK_LBRACE: return parseObject();
+		case TOK_LBRACE: return parseObjet();
 		case TOK_LBRACKET: return parseArray();
 		case TOK_STRING: {
 			JsonValue *v = new JsonValue(_currentToken.value);
@@ -45,7 +44,24 @@ JsonValue	*Parser::parseValue()
 	}
 }
 
-JsonValue	*Parser::parseObject()
+JsonValue	*Parser::parseObjet()
 {
+	JsonValue *obj = new JsonValue();
+	getNextToken(TOK_LBRACE);
 
+	while (_currentToken.type != TOK_RBRACE && _currentToken.type != TOK_EOF)
+	{
+		if (_currentToken.type == TOK_STRING)
+		{
+			std::string key = _currentToken.value;
+			getNextToken(TOK_STRING);
+			getNextToken(TOK_COLON);
+			JsonValue *val = parseValue();
+			obj->addObjetMember(key, val);
+		}
+		if (_currentToken.type == TOK_COMMA)
+			getNextToken(TOK_COMMA);
+	}
+	getNextToken(TOK_RBRACE);
+	return obj;
 }

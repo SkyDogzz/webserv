@@ -30,6 +30,8 @@ public:
 	JsonValue& operator=(const JsonValue &rhs);
 	~JsonValue();
 
+	void	addObjetMember(const std::string &key, JsonValue *val);
+	void	addArrayElement(JsonValue *val);
 	JsonType getType() const;
 private:	
 	JsonType _type;
@@ -45,6 +47,6 @@ private:
 
 	void	_clear();
 	void	_copy(const JsonValue &rhs);
-}
+};
 
 #endif 

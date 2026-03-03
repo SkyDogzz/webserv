@@ -14,10 +14,10 @@ private:
 	Lexer &_lexer;
 	Token _currentToken;
 
-	void	getNextToken();
-	JsonValue	parseValue();
-	JsonValue	parseObjet();
-	JsonValue	parseArray();
+	void	getNextToken(TokenType type);
+	JsonValue	*parseValue();
+	JsonValue	*parseObjet();
+	JsonValue	*parseArray();
 };
 
 #endif
