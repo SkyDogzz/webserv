@@ -33,6 +33,7 @@ public:
 	void	addObjetMember(const std::string &key, JsonValue *val);
 	void	addArrayElement(JsonValue *val);
 	JsonType getType() const;
+	void	print(int indent = 0) const;
 private:	
 	JsonType _type;
 	bool	_boolVal;

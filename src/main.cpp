@@ -4,31 +4,27 @@
 #include "../include/config/Config.hpp"
 #include "../src/config/lexer.hpp"
 #include "../include/core/WebServer.hpp"
+#include "../src/config/parser.hpp"
+#include "../src/config/JsonValue.hpp"
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    std::string filename(argv[1]);
-    Config config = Config(filename);
-	
-	Token tok;
+	if (argc != 2) {
+		std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;
+		return EXIT_FAILURE;
+	}
 	Lexer lexer(argv[1]);
-while ((tok = lexer.getNextToken()).type != TOK_EOF)
-    {
-        std::cout << "Token Type: " << tok.type 
-                  << " | Value: [" << tok.value << "]" << std::endl;
-        if (tok.type == TOK_ERROR) break;
-    }
-    WebServer& webServer = WebServer::getInstance();
-    webServer.appliConfig(config);
+	Parser parser(lexer);
 
-    webServer.run();
-
-    (void)argc;
-    (void)argv;
-    return EXIT_SUCCESS;
+	std::cout << "--- Starting Parsing ---" << std::endl;
+	JsonValue* root = parser.parse();
+	if (root) {
+		std::cout << "--- Parsed JSON Structure ---" << std::endl;
+		root->print();
+		std::cout << "\n--- End of Structure ---" << std::endl;
+		delete root;
+	} else {
+		std::cerr << "Parsing failed!" << std::endl;
+	}
+	return EXIT_SUCCESS;
 }

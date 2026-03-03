@@ -5,6 +5,16 @@ Parser::Parser(Lexer &lexer) : _lexer(lexer)
 	_currentToken = _lexer.getNextToken();
 }
 
+Parser::~Parser()
+{
+
+}
+
+JsonValue	*Parser::parse()
+{
+	return parseValue();
+}
+
 void	Parser::getNextToken(TokenType type)
 {
 	if (_currentToken.type == type)
@@ -25,7 +35,8 @@ JsonValue	*Parser::parseValue()
 			return v;
 		}
 		case TOK_NUMBER: {
-			JsonValue *v = new JsonValue(_currentToken.value);
+			double val = std::atof(_currentToken.value.c_str());
+			JsonValue *v = new JsonValue(val);
 			getNextToken(TOK_NUMBER);
 			return v;
 		}
@@ -65,3 +76,25 @@ JsonValue	*Parser::parseObjet()
 	getNextToken(TOK_RBRACE);
 	return obj;
 }
+
+JsonValue	*Parser::parseArray()
+{
+	JsonValue *arr = new JsonValue();
+	getNextToken(TOK_LBRACKET);
+	
+	while (_currentToken.type != TOK_RBRACKET && _currentToken.type != TOK_EOF)
+	{
+		JsonValue *val = parseValue();
+		if (val)
+			arr->addArrayElement(val);
+		if (_currentToken.type == TOK_COMMA)
+			getNextToken(TOK_COMMA);
+	}
+	getNextToken(TOK_RBRACKET);
+	return arr;
+}
+
+
+
+
+
