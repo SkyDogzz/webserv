@@ -20,7 +20,7 @@ int	fileHasValidExtension(const char *filename)
 		return 0;
 }
 
-void Lexer::readFile(const char *filename)
+void	Lexer::readFile(const char *filename)
 {
 	if (!fileHasValidExtension(filename))
 	{
@@ -42,7 +42,7 @@ void Lexer::readFile(const char *filename)
 	std::cout << _content << std::endl;
 }
 
-Token Lexer::handleString()
+Token	Lexer::handleString()
 {
 	Token	tok;
 	tok.type = TOK_STRING;
@@ -64,7 +64,49 @@ Token Lexer::handleString()
 	return tok;
 }
 
-Token Lexer::getNextToken()
+Token	Lexer::handleNumber()
+{
+	Token tok;
+	tok.type = TOK_NUMBER;
+	tok.value = "";
+
+	while (*_index != '\0' && (isdigit(*_index) || *_index == '.'))
+	{
+		tok.value += *_index;
+		_index++;
+	}
+	return tok;
+}
+
+Token	Lexer::handleIdentifier()
+{
+	Token		tok;
+	std::string	word;
+
+	while (*_index != '\0' && isalpha(*_index))
+	{
+		word += *_index;
+		_index++;
+	}
+	if (word == "true" || word == "false" || word == "TRUE" || word == "FALSE")
+	{
+		tok.type = TOK_BOOL;
+		tok.value = word;
+	}
+	else if (word == "null" || word == "NULL")
+	{
+		tok.type = TOK_NULL;
+		tok.value = word;
+	}
+	else
+	{
+		tok.type = TOK_ERROR;
+		tok.value = "Unexpected identifier: " + word;
+	}
+	return tok;
+}
+
+Token	Lexer::getNextToken()
 {
 	while (*_index && isspace(*_index))
 		_index++;
@@ -85,9 +127,14 @@ Token Lexer::getNextToken()
 		case '[': tok.type = TOK_LBRACKET; _index++; return tok;
 		case ']': tok.type = TOK_RBRACKET; _index++; return tok;
 	}
+	if (isdigit(current) || current == '-')
+		return handleNumber();
 	if (current == '"')
 		return handleString();
+	if (isalpha(current))
+		return handleIdentifier();
 	tok.type = TOK_ERROR;
-	tok.value = "Unknow character";
+	tok.value = current;
+	_index++;
 	return tok;
 }

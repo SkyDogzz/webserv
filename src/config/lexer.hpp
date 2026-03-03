@@ -31,6 +31,8 @@ public:
 	void readFile(const char *filename);
 	Token getNextToken();
 	Token handleString();
+	Token handleNumber();
+	Token handleIdentifier();
 private:
 	std::string	_content;
 	const char	*_start;

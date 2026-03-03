@@ -41,7 +41,7 @@ private:
 	//ok bon cette ligne est sombre, en gros c'est un map avec string comme cle
 	//et un pointeur sur JsonValue comment valeur pour le cas ou un objet est imbrique dans un autre
 	//ca va problement etre tres somnbre a faire compiler
-	std::map<std::string, Jsonvalue*>	*_objectVal;
+	std::map<std::string, JsonValue*>	*_objectVal;
 
 	void	_clear();
 	void	_copy(const JsonValue &rhs);

@@ -1,2 +1,26 @@
-yo les ptits indiens
-xd
+{
+	"servers": [
+		{
+			"listen": "8080",
+			"server_name": "localhost",
+			"error_pages": {
+				"404": "/errors/404.html"
+			},
+			"locations": {
+				"/": {
+					"methods": ["GET"],
+					"root": "./www",
+					"index": "index.html",
+					"autoindex": false
+				},
+				"/cgi-bin": {
+					"methods": ["GET", "POST"],
+					"cgi_path": "/usr/bin/python3",
+					"cgi_ext": ".py",
+					"upload_enable": true,
+					"upload_store": "./www/uploads"
+				}
+			}
+		}
+	]
+}
