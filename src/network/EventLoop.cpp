@@ -3,6 +3,8 @@
 #include "../../include/http/HttpRequestParser.hpp"
 #include "../../include/network/Connection.hpp"
 #include "../../include/network/ListeningSocket.hpp"
+#include "handlers/StaticHandler.hpp"
+#include "http/HttpResponse.hpp"
 #include <cerrno>
 #include <cstring>
 #include <iostream>
@@ -93,8 +95,8 @@ void EventLoop::run()
             std::cerr << "Failed to open listening socket on port " << listens[i].getPort() << std::endl;
             return;
         }
-        std::cout << "Listening socket ready on port " << listens[i].getPort()
-                  << " fd=" << listens[i].getFd() << std::endl;
+        std::cout << "Listening socket ready on port " << listens[i].getPort() << " fd=" << listens[i].getFd()
+                  << std::endl;
         listen_map[listens[i].getFd()] = i;
     }
 
@@ -168,6 +170,7 @@ void EventLoop::run()
                     }
 
                     bool keep_alive = false;
+                    std::cout << "ok = " << ok << std::endl;
                     if (ok) {
                         std::map<std::string, std::string>::iterator hit = request.headers.find("Connection");
                         if (hit != request.headers.end()) {
@@ -182,8 +185,11 @@ void EventLoop::run()
 
                     if (!ok)
                         conn.out_buffer = buildSimpleResponse(400, "Bad Request", keep_alive);
-                    else
-                        conn.out_buffer = buildSimpleResponse(200, "OK", keep_alive);
+                    else {
+                        StaticHandler staticHandler("./");
+                        HttpResponse response = staticHandler.handle(request);
+                        conn.out_buffer = response.toString();
+                    }
                     conn.modEpoll(epfd, true);
                 }
             }

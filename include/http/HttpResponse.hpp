@@ -1,8 +1,9 @@
 #ifndef HTTPRESPONSE_HPP
 #define HTTPRESPONSE_HPP
 
-#include <string>
 #include <map>
+#include <sstream>
+#include <string>
 
 /*
     HttpResponse
