@@ -184,15 +184,24 @@ void EventLoop::run()
                         conn.markCloseAfterWrite();
 
                     if (!ok)
-                        conn.out_buffer = buildSimpleResponse(400, "Bad Request", keep_alive);
+                        conn.out_buffer += buildSimpleResponse(400, "Bad Request", keep_alive);
                     else {
                         StaticHandler staticHandler("./");
                         HttpResponse response = staticHandler.handle(request);
-                        conn.out_buffer = response.toString();
+                        conn.out_buffer += response.toString();
                     }
                     conn.modEpoll(epfd, true);
                 }
             }
+        }
+        std::cout << "got there" << std::endl;
+        for (int i = 0; i < n; ++i) {
+            int fd = events[i].data.fd;
+
+            std::map<int, Connection>::iterator it = conns.find(fd);
+            if (it == conns.end())
+                continue;
+            Connection& conn = it->second;
 
             if (events[i].events & EPOLLOUT) {
                 if (!conn.writeToSocket()) {

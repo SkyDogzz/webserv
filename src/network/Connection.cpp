@@ -1,4 +1,5 @@
 #include "../../include/network/Connection.hpp"
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
@@ -78,7 +79,9 @@ bool Connection::readFromSocket()
 bool Connection::writeToSocket()
 {
     while (!out_buffer.empty()) {
-        ssize_t sent = send(fd, out_buffer.c_str(), out_buffer.size(), 0);
+        const size_t chunk_size = 4096;
+        size_t to_send = std::min(out_buffer.size(), chunk_size);
+        ssize_t sent = send(fd, out_buffer.c_str(), to_send, 0);
         if (sent > 0) {
             out_buffer.erase(0, sent);
             continue;
@@ -101,10 +104,7 @@ void Connection::markCloseAfterWrite() { close_after_write = true; }
 
 bool Connection::wantsWrite() const { return !out_buffer.empty(); }
 
-bool Connection::shouldCloseAfterWrite() const
-{
-    return close_after_write && !keep_alive && out_buffer.empty();
-}
+bool Connection::shouldCloseAfterWrite() const { return close_after_write && !keep_alive && out_buffer.empty(); }
 
 bool Connection::addToEpoll(int epfd) const
 {
