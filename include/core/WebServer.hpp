@@ -2,6 +2,7 @@
 #define WEBSERVER_HPP
 
 #include "../config/Config.hpp"
+#include "../network/EventLoop.hpp"
 
 /*
     WebServer
@@ -25,6 +26,7 @@ private:
     WebServer& operator=(const WebServer& other);
 
     bool _running;
+    EventLoop _event_loop;
 
     static void sigintHandler(int signal);
 
@@ -34,6 +36,7 @@ public:
     static WebServer& getInstance();
     void appliConfig(Config& config);
     void run();
+    bool isRunning();
 };
 
 #endif

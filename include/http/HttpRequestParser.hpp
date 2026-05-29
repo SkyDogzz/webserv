@@ -18,7 +18,11 @@
 
 class HttpRequestParser {
 public:
-    bool parse(const std::string& buffer, HttpRequest& request);
+    static bool parse(const std::string& buffer, HttpRequest& request);
+
+    class FirstLineInvalidException : public std::exception {
+        const char* what() const throw() { return "First line invalid exception"; }
+    };
 };
 
 #endif
