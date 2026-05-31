@@ -3,6 +3,7 @@
 
 # include "lexer.hpp"
 # include "JsonValue.hpp"
+# include <cstdlib>
 
 class Parser
 {
