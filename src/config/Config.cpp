@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <iostream>
+#include <stdexcept>
 
 // Helper to convert size string (e.g., 10M, 1M, 250K) to bytes
 static size_t parseBodySize(const std::string& sizeStr) {
@@ -26,14 +27,14 @@ static size_t parseBodySize(const std::string& sizeStr) {
 
 Config::Config(JsonValue *obj) {
     if (!obj || obj->getType() != JSON_OBJET) {
-        return;
+        throw std::runtime_error("Config root must be an object");
     }
 
     const std::map<std::string, JsonValue*>& root = obj->asObject();
     std::map<std::string, JsonValue*>::const_iterator serversIt = root.find("servers");
 
     if (serversIt == root.end() || serversIt->second->getType() != JSON_ARRAY) {
-        return;
+        throw std::runtime_error("Config must contain a 'servers' array");
     }
 
     const std::vector<JsonValue*>& serversArr = serversIt->second->asArray();
@@ -54,12 +55,17 @@ Config::Config(JsonValue *obj) {
                 size_t colonPos = listenStr.find(':');
                 if (colonPos != std::string::npos) {
                     s.host = listenStr.substr(0, colonPos);
-                    s.port = std::atoi(listenStr.substr(colonPos + 1).c_str());
+                    std::string portStr = listenStr.substr(colonPos + 1);
+                    if (portStr.empty()) throw std::runtime_error("Empty port in listen directive");
+                    s.port = std::atoi(portStr.c_str());
                 } else {
                     s.port = std::atoi(listenStr.c_str());
                 }
             } else if (listenIt->second->getType() == JSON_NUMBER) {
                 s.port = static_cast<int>(listenIt->second->asNumber());
+            }
+            if (s.port <= 0 || s.port > 65535) {
+                throw std::runtime_error("Invalid port in configuration");
             }
         }
 
@@ -130,7 +136,6 @@ Config::Config(JsonValue *obj) {
                     if (locRootIt != locData.end() && locRootIt->second->getType() == JSON_STRING) {
                         loc.root = locRootIt->second->asString();
                     } else {
-                        // Inherit server root if not overridden in location
                         loc.root = s.root;
                     }
 
@@ -139,7 +144,6 @@ Config::Config(JsonValue *obj) {
                     if (locIdxIt != locData.end() && locIdxIt->second->getType() == JSON_STRING) {
                         loc.index = locIdxIt->second->asString();
                     } else {
-                        // Inherit server index if not overridden in location
                         loc.index = s.index;
                     }
 
@@ -147,6 +151,20 @@ Config::Config(JsonValue *obj) {
                     std::map<std::string, JsonValue*>::const_iterator autoIt = locData.find("autoindex");
                     if (autoIt != locData.end() && autoIt->second->getType() == JSON_BOOL) {
                         loc.autoindex = autoIt->second->asBool();
+                    }
+
+                    // return (redirection)
+                    std::map<std::string, JsonValue*>::const_iterator retIt = locData.find("return");
+                    if (retIt != locData.end() && retIt->second->getType() == JSON_OBJET) {
+                        const std::map<std::string, JsonValue*>& retData = retIt->second->asObject();
+                        std::map<std::string, JsonValue*>::const_iterator codeIt = retData.find("code");
+                        std::map<std::string, JsonValue*>::const_iterator urlIt = retData.find("url");
+                        if (codeIt != retData.end() && codeIt->second->getType() == JSON_NUMBER) {
+                            loc.redirect_code = static_cast<int>(codeIt->second->asNumber());
+                        }
+                        if (urlIt != retData.end() && urlIt->second->getType() == JSON_STRING) {
+                            loc.redirect_url = urlIt->second->asString();
+                        }
                     }
 
                     // CGI
@@ -173,7 +191,6 @@ Config::Config(JsonValue *obj) {
                 s.locations.push_back(loc);
             }
         }
-
         this->servers.push_back(s);
     }
 }

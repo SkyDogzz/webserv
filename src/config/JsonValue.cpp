@@ -4,6 +4,12 @@
 JsonValue::JsonValue() : _type(JSON_NULL), _boolVal(false), _numberVal(0), 
 			_stringVal(NULL), _arrayVal(NULL), _objectVal(NULL) {}
 
+JsonValue::JsonValue(JsonType t) : _type(t), _boolVal(false), _numberVal(0), 
+			_stringVal(NULL), _arrayVal(NULL), _objectVal(NULL) {
+	if (t == JSON_ARRAY) _arrayVal = new std::vector<JsonValue*>();
+	if (t == JSON_OBJET) _objectVal = new std::map<std::string, JsonValue*>();
+}
+
 JsonValue::JsonValue(const std::string &s) : _type(JSON_STRING), _boolVal(false), _numberVal(0),
 						_arrayVal(NULL), _objectVal(NULL) {
 	_stringVal = new std::string(s);
@@ -126,4 +132,14 @@ void	JsonValue::print(int indent) const {
             std::cout << spaces << "}";
             break;
     }
+}
+
+bool JsonValue::isValid(const JsonValue *val) {
+	if (!val)
+		return false;
+	if (val->getType() == JSON_OBJET) {
+		const std::map<std::string, JsonValue*> &obj = val->asObject();
+		if (obj.empty()) return false;
+	}
+	return true;
 }

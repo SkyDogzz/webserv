@@ -14,6 +14,9 @@ public:
 private:
 	Lexer &_lexer;
 	Token _currentToken;
+	bool _hasError;
+	int  _depth;
+	static const int MAX_DEPTH = 100;
 
 	void	getNextToken(TokenType type);
 	JsonValue	*parseValue();

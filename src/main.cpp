@@ -18,17 +18,10 @@ int main(int argc, char* argv[])
 
 	std::cout << "--- Starting Parsing ---" << std::endl;
 	JsonValue* root = parser.parse();
-/*	if (root) {
-		std::cout << "--- Parsed JSON Structure ---" << std::endl;
-		root->print();
-		std::cout << "\n--- End of Structure ---" << std::endl;
+
+	if (!JsonValue::isValid(root)) {
+		std::cerr << "Parsing failed or JSON structure is invalid!" << std::endl;
 		delete root;
-	} else {
-		std::cerr << "Parsing failed!" << std::endl;
-	}
-	return EXIT_SUCCESS; */
-	if (!root) {
-		std::cerr << "Parsing failed!" << std::endl;
 		return EXIT_FAILURE;
 	}
 
@@ -48,6 +41,7 @@ int main(int argc, char* argv[])
 		webServer.run();
 	} catch (std::exception& e) {
 		std::cerr << "Unknown exception throwed: " << e.what() << std::endl;
+		return EXIT_FAILURE;
 	}
 
     (void)argc;

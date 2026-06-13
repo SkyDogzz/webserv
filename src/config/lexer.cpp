@@ -51,6 +51,12 @@ Token	Lexer::handleString()
 	_index++;
 	while (*_index != '\0' && *_index != '"')
 	{
+		if (*_index == '\n')
+		{
+			tok.type = TOK_ERROR;
+			tok.value = "Newline in string";
+			return tok;
+		}
 		tok.value += *_index;
 		_index++;
 	}
@@ -70,10 +76,40 @@ Token	Lexer::handleNumber()
 	tok.type = TOK_NUMBER;
 	tok.value = "";
 
-	while (*_index != '\0' && (isdigit(*_index) || *_index == '.'))
+	if (*_index == '-')
 	{
 		tok.value += *_index;
 		_index++;
+	}
+	
+	if (*_index == '0' && isdigit(*(_index + 1)))
+	{
+		tok.type = TOK_ERROR;
+		tok.value = "Leading zero in number";
+		return tok;
+	}
+
+	bool hasDot = false;
+	while (*_index != '\0' && (isdigit(*_index) || *_index == '.'))
+	{
+		if (*_index == '.')
+		{
+			if (hasDot)
+			{
+				tok.type = TOK_ERROR;
+				tok.value = "Multiple dots in number";
+				return tok;
+			}
+			hasDot = true;
+		}
+		tok.value += *_index;
+		_index++;
+	}
+	
+	if (tok.value == "-" || tok.value == "." || tok.value[tok.value.size() - 1] == '.')
+	{
+		tok.type = TOK_ERROR;
+		tok.value = "Invalid number: " + tok.value;
 	}
 	return tok;
 }
@@ -108,6 +144,11 @@ Token	Lexer::handleIdentifier()
 
 Token	Lexer::getNextToken()
 {
+	if (!_index)
+	{
+		Token err = {TOK_ERROR, "Lexer not initialized (file error)"};
+		return err;
+	}
 	while (*_index && isspace(*_index))
 		_index++;
 	if (*_index == '\0')

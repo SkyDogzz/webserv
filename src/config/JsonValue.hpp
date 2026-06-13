@@ -23,6 +23,7 @@ class JsonValue
 {
 public:
 	JsonValue();
+	JsonValue(JsonType t);
 	JsonValue(bool b);
 	JsonValue(double n);
 	JsonValue(const std::string &s);
@@ -34,6 +35,8 @@ public:
 	void	addArrayElement(JsonValue *val);
 	JsonType getType() const;
 	void	print(int indent = 0) const;
+
+	static bool isValid(const JsonValue *val);
 
 	// Getters
 	bool								asBool() const;

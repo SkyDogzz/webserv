@@ -15,9 +15,11 @@
     Purely I/O multiplexing.
 */
 
+class Config;
+
 class EventLoop {
 public:
-    void run();
+    void run(Config* config);
 };
 
 #endif
