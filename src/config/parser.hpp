@@ -2,6 +2,7 @@
 # define PARSER_HPP
 
 # include "lexer.hpp"
+# include <cstdlib>
 # include "JsonValue.hpp"
 
 class Parser

@@ -10,12 +10,16 @@ void WebServer::sigintHandler(int signal)
 }
 
 WebServer::WebServer()
-    : _running(true)
+    : _running(true), _config(NULL)
 {
     signal(SIGINT, &WebServer::sigintHandler);
 }
 
-WebServer::~WebServer() { }
+WebServer::~WebServer() {
+    if (_config) {
+        delete _config;
+    }
+}
 
 WebServer& WebServer::getInstance()
 {
@@ -23,8 +27,10 @@ WebServer& WebServer::getInstance()
     return _instance;
 }
 
-void WebServer::appliConfig(Config& config) { (void)config; }
+void WebServer::appliConfig(Config& config) {
+	(void)config;
+}
 
-void WebServer::run() { _event_loop.run(); }
+void WebServer::run() { _event_loop.run(_config); }
 
 bool WebServer::isRunning() { return _running; }

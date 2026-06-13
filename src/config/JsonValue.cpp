@@ -63,6 +63,39 @@ void	JsonValue::addObjetMember(const std::string &key, JsonValue *val)
 	(*_objectVal)[key] = val;
 }
 
+JsonType JsonValue::getType() const {
+	return _type;
+}
+
+bool JsonValue::asBool() const {
+	return _boolVal;
+}
+
+double JsonValue::asNumber() const {
+	return _numberVal;
+}
+
+const std::string &JsonValue::asString() const {
+	static const std::string empty = "";
+	if (_stringVal)
+		return *_stringVal;
+	return empty;
+}
+
+const std::vector<JsonValue*> &JsonValue::asArray() const {
+	static const std::vector<JsonValue*> empty;
+	if (_arrayVal)
+		return *_arrayVal;
+	return empty;
+}
+
+const std::map<std::string, JsonValue*> &JsonValue::asObject() const {
+	static const std::map<std::string, JsonValue*> empty;
+	if (_objectVal)
+		return *_objectVal;
+	return empty;
+}
+
 void	JsonValue::print(int indent) const {
 	std::string spaces(indent, ' ');
     switch (_type) {

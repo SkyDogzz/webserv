@@ -34,6 +34,13 @@ public:
 	void	addArrayElement(JsonValue *val);
 	JsonType getType() const;
 	void	print(int indent = 0) const;
+
+	// Getters
+	bool								asBool() const;
+	double								asNumber() const;
+	const std::string					&asString() const;
+	const std::vector<JsonValue*>		&asArray() const;
+	const std::map<std::string, JsonValue*>	&asObject() const;
 private:	
 	JsonType _type;
 	bool	_boolVal;

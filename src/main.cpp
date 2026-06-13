@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
 
 	std::cout << "--- Starting Parsing ---" << std::endl;
 	JsonValue* root = parser.parse();
-	if (root) {
+/*	if (root) {
 		std::cout << "--- Parsed JSON Structure ---" << std::endl;
 		root->print();
 		std::cout << "\n--- End of Structure ---" << std::endl;
@@ -26,18 +26,29 @@ int main(int argc, char* argv[])
 	} else {
 		std::cerr << "Parsing failed!" << std::endl;
 	}
-	return EXIT_SUCCESS;
-    try {
-        std::string filename(argv[1]);
-        Config config = Config(filename);
+	return EXIT_SUCCESS; */
+	if (!root) {
+		std::cerr << "Parsing failed!" << std::endl;
+		return EXIT_FAILURE;
+	}
 
-        WebServer& webServer = WebServer::getInstance();
-        webServer.appliConfig(config);
+	try {
+		Config* config = new Config(root);
+		delete root;
 
-        webServer.run();
-    } catch (std::exception& e) {
-        std::cerr << "Unknown exception throwed: " << e.what() << std::endl;
-    }
+		std::cout << "Parsed " << config->servers.size() << " server(s):" << std::endl;
+		for (size_t i = 0; i < config->servers.size(); ++i) {
+			std::cout << "  Server #" << i << ": " << config->servers[i].server_name 
+			          << " listening on " << config->servers[i].host << ":" 
+			          << config->servers[i].port << std::endl;
+		}
+
+		WebServer& webServer = WebServer::getInstance();
+		webServer._config = config;
+		webServer.run();
+	} catch (std::exception& e) {
+		std::cerr << "Unknown exception throwed: " << e.what() << std::endl;
+	}
 
     (void)argc;
     (void)argv;

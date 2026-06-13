@@ -81,23 +81,39 @@ static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
         conns.erase(it);
 }
 
-void EventLoop::run()
+void EventLoop::run(Config* config)
 {
-    std::vector<ListeningSocket> listens;
-    listens.push_back(ListeningSocket("", "8080", 128));
-    listens.push_back(ListeningSocket("", "8081", 128));
+    if (!config) {
+        std::cerr << "No configuration provided to EventLoop" << std::endl;
+        return;
+    }
 
-    std::cout << "listening to socket 8080 8081" << std::endl;
+    std::vector<ListeningSocket> listens;
+    for (size_t i = 0; i < config->servers.size(); ++i) {
+        std::ostringstream oss;
+        oss << config->servers[i].port;
+        listens.push_back(ListeningSocket(config->servers[i].host, oss.str(), 128));
+    }
+
+    if (listens.empty()) {
+        std::cerr << "No servers configured" << std::endl;
+        return;
+    }
 
     std::map<int, size_t> listen_map;
     for (size_t i = 0; i < listens.size(); ++i) {
         if (listens[i].getFd() == -1) {
             std::cerr << "Failed to open listening socket on port " << listens[i].getPort() << std::endl;
-            return;
+            continue;
         }
         std::cout << "Listening socket ready on port " << listens[i].getPort() << " fd=" << listens[i].getFd()
                   << std::endl;
         listen_map[listens[i].getFd()] = i;
+    }
+
+    if (listen_map.empty()) {
+        std::cerr << "No listening sockets could be opened" << std::endl;
+        return;
     }
 
     int epfd = epoll_create1(0);
@@ -106,8 +122,9 @@ void EventLoop::run()
         return;
     }
 
-    for (size_t i = 0; i < listens.size(); ++i)
-        listens[i].addToEpoll(epfd);
+    for (std::map<int, size_t>::iterator it = listen_map.begin(); it != listen_map.end(); ++it) {
+        listens[it->second].addToEpoll(epfd);
+    }
 
     std::map<int, Connection> conns;
 
@@ -186,7 +203,29 @@ void EventLoop::run()
                     if (!ok)
                         conn.out_buffer = buildSimpleResponse(400, "Bad Request", keep_alive);
                     else {
-                        StaticHandler staticHandler("./");
+                        int listen_fd = conn.getListenFd();
+                        size_t srv_idx = listen_map[listen_fd];
+                        const ServerConfig& srv_cfg = config->servers[srv_idx];
+                        
+                        // Find the best matching location (longest prefix)
+                        const LocationConfig* best_loc = NULL;
+                        for (size_t j = 0; j < srv_cfg.locations.size(); ++j) {
+                            if (request.path.find(srv_cfg.locations[j].path) == 0) {
+                                if (!best_loc || srv_cfg.locations[j].path.length() > best_loc->path.length()) {
+                                    best_loc = &srv_cfg.locations[j];
+                                }
+                            }
+                        }
+
+                        std::string root = srv_cfg.root;
+                        if (best_loc && !best_loc->root.empty()) {
+                            root = best_loc->root;
+                        }
+                        if (root.empty()) {
+                            root = "./";
+                        }
+
+                        StaticHandler staticHandler(root);
                         HttpResponse response = staticHandler.handle(request);
                         conn.out_buffer = response.toString();
                     }
