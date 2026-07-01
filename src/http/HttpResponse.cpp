@@ -1,4 +1,5 @@
 #include "../../include/http/HttpResponse.hpp"
+#include "../../include/http/HttpStatus.hpp"
 
 std::string HttpResponse::toString() const
 {
@@ -15,16 +16,7 @@ std::string HttpResponse::toString() const
         contentType = it->second;
     }
 
-    out << "HTTP/1.1 " << status_code << " ";
-    if (status_code == 200)
-        out << "OK";
-    else if (status_code == 400)
-        out << "Bad Request";
-    else if (status_code == 404)
-        out << "Not Found";
-    else
-        out << "Error";
-    out << "\r\n";
+    out << "HTTP/1.1 " << status_code << " " << httpReasonPhrase(status_code) << "\r\n";
     out << "Content-Type: " << contentType << "\r\n";
     out << "Content-Length: " << body.size() << "\r\n";
     out << "Connection: " << (keep_alive ? "keep-alive" : "close") << "\r\n";

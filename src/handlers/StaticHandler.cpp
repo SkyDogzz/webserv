@@ -1,4 +1,5 @@
 #include "../../include/handlers/StaticHandler.hpp"
+#include "../../include/http/HttpStatus.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -59,7 +60,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
 
     if (request.method != "GET" && request.method != "HEAD") {
         response.status_code = 405;
-        response.body = "Method Not Allowed";
+        response.body = httpReasonPhrase(response.status_code);
         response.headers["Content-Length"] = "18";
         response.headers["Content-Type"] = "text/plain";
         return response;
@@ -67,7 +68,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
 
     if (isPathTraversal(request.path)) {
         response.status_code = 403;
-        response.body = "Forbidden";
+        response.body = httpReasonPhrase(response.status_code);
         response.headers["Content-Length"] = "9";
         response.headers["Content-Type"] = "text/plain";
         return response;
@@ -78,7 +79,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
     std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
         response.status_code = 404;
-        response.body = "Not Found";
+        response.body = httpReasonPhrase(response.status_code);
         response.headers["Content-Length"] = "9";
         response.headers["Content-Type"] = "text/plain";
         return response;

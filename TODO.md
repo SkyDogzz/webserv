@@ -247,7 +247,7 @@ Validation:
 
 Objectif: produire des reponses correctes, completes et coherentes.
 
-- [~] Centraliser les reason phrases:
+- [x] Centraliser les reason phrases:
   - 200 OK
   - 201 Created
   - 204 No Content

@@ -1,6 +1,7 @@
 #include "../../include/network/EventLoop.hpp"
 #include "../../include/core/WebServer.hpp"
 #include "../../include/http/HttpRequestParser.hpp"
+#include "../../include/http/HttpStatus.hpp"
 #include "../../include/network/Connection.hpp"
 #include "../../include/network/ListeningSocket.hpp"
 #include "handlers/StaticHandler.hpp"
@@ -55,16 +56,7 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
 static std::string buildSimpleResponse(int status_code, const std::string& body, bool keep_alive)
 {
     std::ostringstream out;
-    out << "HTTP/1.1 " << status_code << " ";
-    if (status_code == 200)
-        out << "OK";
-    else if (status_code == 400)
-        out << "Bad Request";
-    else if (status_code == 404)
-        out << "Not Found";
-    else
-        out << "Error";
-    out << "\r\n";
+    out << "HTTP/1.1 " << status_code << " " << httpReasonPhrase(status_code) << "\r\n";
     out << "Content-Type: text/plain\r\n";
     out << "Content-Length: " << body.size() << "\r\n";
     out << "Connection: " << (keep_alive ? "keep-alive" : "close") << "\r\n";
@@ -184,7 +176,7 @@ void EventLoop::run()
                         conn.markCloseAfterWrite();
 
                     if (!ok)
-                        conn.out_buffer = buildSimpleResponse(400, "Bad Request", keep_alive);
+                        conn.out_buffer = buildSimpleResponse(400, httpReasonPhrase(400), keep_alive);
                     else {
                         StaticHandler staticHandler("./");
                         HttpResponse response = staticHandler.handle(request);
