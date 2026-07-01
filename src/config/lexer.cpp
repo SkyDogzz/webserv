@@ -1,9 +1,10 @@
 #include "lexer.hpp"
+#include "../../include/utils/DebugLogger.hpp"
 #include <fstream>
 #include <sstream>
 Lexer::Lexer(const char *input) : _start(0), _index(0)
 {
-	std::cout << "lexer class instanciated\n";
+	DEBUG_LOG << "lexer class instanciated\n";
 	readFile(input);
 }
 
@@ -33,13 +34,13 @@ void	Lexer::readFile(const char *filename)
 		std::cerr << "Error: file missing or invalid " << filename << std::endl;
 		return ;
 	}
-	std::cout << filename << std::endl;
+	DEBUG_LOG << filename << std::endl;
 	std::string line;
 	while (std::getline(ifs, line))
 		_content += line + "\n";
 	_start = _content.c_str();
 	_index = _start;
-	std::cout << _content << std::endl;
+	DEBUG_LOG << _content << std::endl;
 }
 
 Token	Lexer::handleString()
