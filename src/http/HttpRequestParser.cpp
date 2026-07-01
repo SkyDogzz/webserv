@@ -1,4 +1,5 @@
 #include "../../include/http/HttpRequestParser.hpp"
+#include "../../include/utils/DebugLogger.hpp"
 #include <iostream>
 #include <sstream>
 #include <utility>
@@ -14,7 +15,7 @@ bool validStartLine(HttpRequest& request)
 
 bool parseStartLine(const std::string& line, HttpRequest& request)
 {
-    std::cout << line << std::endl;
+    DEBUG_LOG << line << std::endl;
     std::string trimmed = line;
     if (!trimmed.empty() && trimmed[trimmed.size() - 1] == '\r')
         trimmed.erase(trimmed.size() - 1);
@@ -47,21 +48,21 @@ bool pushHeader(const std::string& line, HttpRequest& request)
 
 void printRequest(HttpRequest& request)
 {
-    std::cout << "First line" << std::endl;
-    std::cout << "Method: \"" << request.method << "\"" << std::endl;
-    std::cout << "Path: \"" << request.path << "\"" << std::endl;
-    std::cout << "Version: \"" << request.version << "\"" << std::endl;
-    std::cout << std::endl;
+    DEBUG_LOG << "First line" << std::endl;
+    DEBUG_LOG << "Method: \"" << request.method << "\"" << std::endl;
+    DEBUG_LOG << "Path: \"" << request.path << "\"" << std::endl;
+    DEBUG_LOG << "Version: \"" << request.version << "\"" << std::endl;
+    DEBUG_LOG << std::endl;
 
-    std::cout << "Headers" << std::endl;
+    DEBUG_LOG << "Headers" << std::endl;
     std::map<std::string, std::string>::iterator it;
     for (it = request.headers.begin(); it != request.headers.end(); it++) {
-        std::cout << it->first << " :" << it->second << std::endl;
+        DEBUG_LOG << it->first << " :" << it->second << std::endl;
     }
-    std::cout << std::endl;
+    DEBUG_LOG << std::endl;
 
-    std::cout << "Body:" << std::endl;
-    std::cout << request.body << std::endl;
+    DEBUG_LOG << "Body:" << std::endl;
+    DEBUG_LOG << request.body << std::endl;
 }
 
 bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)

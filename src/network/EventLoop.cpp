@@ -4,6 +4,7 @@
 #include "../../include/http/HttpStatus.hpp"
 #include "../../include/network/Connection.hpp"
 #include "../../include/network/ListeningSocket.hpp"
+#include "../../include/utils/DebugLogger.hpp"
 #include "handlers/StaticHandler.hpp"
 #include "http/HttpResponse.hpp"
 #include <cerrno>
@@ -80,7 +81,7 @@ void EventLoop::run()
     listens.push_back(ListeningSocket("", "8080", 128));
     listens.push_back(ListeningSocket("", "8081", 128));
 
-    std::cout << "listening to socket 8080 8081" << std::endl;
+    DEBUG_LOG << "listening to socket 8080 8081" << std::endl;
 
     std::map<int, size_t> listen_map;
     for (size_t i = 0; i < listens.size(); ++i) {
@@ -88,7 +89,7 @@ void EventLoop::run()
             std::cerr << "Failed to open listening socket on port " << listens[i].getPort() << std::endl;
             return;
         }
-        std::cout << "Listening socket ready on port " << listens[i].getPort() << " fd=" << listens[i].getFd()
+        DEBUG_LOG << "Listening socket ready on port " << listens[i].getPort() << " fd=" << listens[i].getFd()
                   << std::endl;
         listen_map[listens[i].getFd()] = i;
     }
@@ -123,7 +124,7 @@ void EventLoop::run()
                     int client_fd = listen.acceptClient();
                     if (client_fd == -1)
                         break;
-                    std::cout << "Accepted client fd=" << client_fd << " on listen fd=" << listen.getFd()
+                    DEBUG_LOG << "Accepted client fd=" << client_fd << " on listen fd=" << listen.getFd()
                               << " port=" << listen.getPort() << std::endl;
                     Connection& conn = conns[client_fd];
                     conn.init(client_fd, listen.getFd());
@@ -163,7 +164,7 @@ void EventLoop::run()
                     }
 
                     bool keep_alive = false;
-                    std::cout << "ok = " << ok << std::endl;
+                    DEBUG_LOG << "ok = " << ok << std::endl;
                     if (ok) {
                         std::map<std::string, std::string>::iterator hit = request.headers.find("Connection");
                         if (hit != request.headers.end()) {

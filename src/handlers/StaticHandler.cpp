@@ -1,5 +1,6 @@
 #include "../../include/handlers/StaticHandler.hpp"
 #include "../../include/http/HttpStatus.hpp"
+#include "../../include/utils/DebugLogger.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -30,11 +31,11 @@ std::string StaticHandler::buildPath(const std::string& uri) const
 std::string StaticHandler::guessMimeType(const std::string& path) const
 {
     std::size_t dot = path.rfind('.');
-    std::cout << "find dot ?: " << dot << std::endl;
+    DEBUG_LOG << "find dot ?: " << dot << std::endl;
     if (dot == std::string::npos)
         return "application/octet-stream";
     std::string ext = path.substr(dot + 1);
-    std::cout << "find ext: " << ext << std::endl;
+    DEBUG_LOG << "find ext: " << ext << std::endl;
 
     if (ext == "html" || ext == "htm")
         return "text/html";
@@ -75,7 +76,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
     }
 
     std::string file_path = buildPath(request.path);
-    std::cout << "try path: \"" << file_path << "\"" << std::endl;
+    DEBUG_LOG << "try path: \"" << file_path << "\"" << std::endl;
     std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
         response.status_code = 404;
@@ -89,7 +90,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
     buffer << file.rdbuf();
     std::string body = buffer.str();
     response.headers["Content-Type"] = guessMimeType(file_path);
-    std::cout << response.headers["Content-Type"] << std::endl;
+    DEBUG_LOG << response.headers["Content-Type"] << std::endl;
 
     std::ostringstream len;
     len << body.size();
@@ -97,7 +98,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
 
     if (request.method != "HEAD")
         response.body = body;
-    std::cout << "request: " << std::endl;
-    std::cout << response.toString() << std::endl;
+    DEBUG_LOG << "request: " << std::endl;
+    DEBUG_LOG << response.toString() << std::endl;
     return response;
 }

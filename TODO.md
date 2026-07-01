@@ -71,7 +71,7 @@ Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
   - string trim/lowercase
   - path utilities.
 - [x] Fermer proprement `epfd` et tous les sockets a l'arret.
-- [~] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
+- [x] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
 
 Validation:
 

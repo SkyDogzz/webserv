@@ -1,4 +1,5 @@
 #include "../../include/network/ListeningSocket.hpp"
+#include "../../include/utils/DebugLogger.hpp"
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
@@ -106,7 +107,7 @@ bool ListeningSocket::open(const std::string& host, const std::string& port, int
             }
             makeNonBlocking(socket_fd);
             fd = socket_fd;
-            std::cout << "Listening on " << (gni == 0 ? hostbuf : "*") << ":" << (gni == 0 ? servbuf : port)
+            DEBUG_LOG << "Listening on " << (gni == 0 ? hostbuf : "*") << ":" << (gni == 0 ? servbuf : port)
                       << " fd=" << fd << std::endl;
             break;
         }

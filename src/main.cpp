@@ -4,6 +4,7 @@
 
 #include "../include/config/Config.hpp"
 #include "../include/core/WebServer.hpp"
+#include "../include/utils/DebugLogger.hpp"
 
 int main(int argc, char* argv[])
 {
@@ -11,6 +12,10 @@ int main(int argc, char* argv[])
         std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;
         return EXIT_FAILURE;
     }
+
+    bool debug_logs = false;
+    DebugLogger::setEnabled(debug_logs);
+
     try {
         std::string filename(argv[1]);
         Config config = Config(filename);
