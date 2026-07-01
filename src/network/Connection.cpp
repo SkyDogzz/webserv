@@ -1,5 +1,4 @@
 #include "../../include/network/Connection.hpp"
-#include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <sys/epoll.h>
@@ -67,10 +66,6 @@ bool Connection::readFromSocket()
         std::cerr << "recv EOF on fd=" << fd << std::endl;
         return false;
     }
-    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-        std::cerr << "recv error on fd=" << fd << ": " << std::strerror(errno) << std::endl;
-        return false;
-    }
     return true;
 }
 
@@ -86,10 +81,6 @@ bool Connection::writeToSocket()
     }
     if (sent == 0) {
         std::cerr << "send returned 0 on fd=" << fd << std::endl;
-        return false;
-    }
-    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-        std::cerr << "send error on fd=" << fd << ": " << std::strerror(errno) << std::endl;
         return false;
     }
     return true;
