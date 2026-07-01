@@ -1,6 +1,6 @@
 NAME := webserv
 CC := g++
-CFLAGS := -Wall -Wextra -Werror -Wunused-function -std=c++98 -MMD -MP -Ofast
+CFLAGS := -Wall -Wextra -Werror -Wunused-function -std=c++98 -MMD -MP
 LDFLAGS :=
 INCLUDES := -I ./include
 
@@ -17,7 +17,7 @@ SRC_PATH := src/
 
 OBJ_PATH := obj/
 
-SRC := $(shell find $(SRC_PATH) -type f -name "*.cpp" -printf "%P\n")
+SRC := $(shell find $(SRC_PATH) -type f -name "*.cpp" | sed 's#^$(SRC_PATH)##')
 
 SRCS := $(addprefix $(SRC_PATH), $(SRC))
 OBJS := $(addprefix $(OBJ_PATH), $(SRC:.cpp=.o))

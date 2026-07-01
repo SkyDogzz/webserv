@@ -20,7 +20,7 @@
 
 class Config {
 public:
-    Config(std::string& filename);
+    explicit Config(const std::string& filename);
 
     std::vector<ServerConfig> servers;
 };
