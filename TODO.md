@@ -146,7 +146,7 @@ Objectif: respecter strictement le modele I/O du sujet.
 - [x] Garder un seul appel `epoll_wait` central pour toutes les I/O sockets.
 - [x] Sur sockets clients, ne faire `recv` que quand `EPOLLIN` est signale.
 - [x] Sur sockets clients, ne faire `send` que quand `EPOLLOUT` est signale.
-- [ ] Retirer la logique qui consulte `errno` apres `recv`/`send`.
+- [x] Retirer la logique qui consulte `errno` apres `recv`/`send`.
 - [x] Eviter les boucles read/write jusqu'a `EAGAIN`; traiter une quantite bornee par event.
 - [x] Gerer les envois partiels:
   - garder le reste dans `out_buffer`.
