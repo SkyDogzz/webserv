@@ -54,14 +54,14 @@ Legende:
 Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
 
 - [x] Verifier que le Makefile respecte strictement le sujet: `NAME`, `all`, `clean`, `fclean`, `re`, pas de relink inutile.
-- [ ] Remplacer `find -printf` si la correction vise aussi macOS, car `-printf` n'est pas portable BSD.
-- [ ] Decider si `-Ofast` reste dans `CFLAGS`; preferer un build de correction simple et debuggable.
-- [ ] Retirer ou deplacer `server.cpp` et `client.cpp` hors des fichiers soumis si ce sont seulement des notes/experiences.
-- [ ] Initialiser toutes les donnees de config avec des constructeurs explicites:
+- [x] Remplacer `find -printf` si la correction vise aussi macOS, car `-printf` n'est pas portable BSD.
+- [x] Decider si `-Ofast` reste dans `CFLAGS`; preferer un build de correction simple et debuggable.
+- [x] Retirer ou deplacer `server.cpp` et `client.cpp` hors des fichiers soumis si ce sont seulement des notes/experiences.
+- [x] Initialiser toutes les donnees de config avec des constructeurs explicites:
   - `ServerConfig::port`
   - `ServerConfig::client_max_body_size`
   - `LocationConfig::autoindex`
-- [ ] Rendre les signatures const-correct:
+- [x] Rendre les signatures const-correct:
   - `Config(const std::string& filename)`
   - accesseurs quand necessaire.
 - [~] Centraliser les helpers communs:
@@ -70,14 +70,14 @@ Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
   - status reason phrases
   - string trim/lowercase
   - path utilities.
-- [~] Fermer proprement `epfd` et tous les sockets a l'arret.
+- [x] Fermer proprement `epfd` et tous les sockets a l'arret.
 - [~] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
 
 Validation:
 
 - [x] `make re` passe avec `-Wall -Wextra -Werror -std=c++98`.
 - [x] `make` relance immediatement sans relink inutile.
-- [ ] Aucun fichier experimental hors build ne peut perturber l'evaluation.
+- [x] Aucun fichier experimental hors build ne peut perturber l'evaluation.
 
 ## Epic 2 - Parser de configuration
 
@@ -142,12 +142,12 @@ Objectif: respecter strictement le modele I/O du sujet.
 - [ ] Remplacer les listeners hardcodes de `EventLoop` par les `listen` issus de `Config`.
 - [ ] Gerer plusieurs `server` sur un meme port sans double bind inutile.
 - [ ] Associer chaque fd listener a sa config server ou a un groupe de servers.
-- [ ] Remplacer `epoll_create1(0)` par `epoll_create(size)` pour rester dans les fonctions autorisees.
+- [x] Remplacer `epoll_create1(0)` par `epoll_create(size)` pour rester dans les fonctions autorisees.
 - [x] Garder un seul appel `epoll_wait` central pour toutes les I/O sockets.
 - [x] Sur sockets clients, ne faire `recv` que quand `EPOLLIN` est signale.
 - [x] Sur sockets clients, ne faire `send` que quand `EPOLLOUT` est signale.
 - [ ] Retirer la logique qui consulte `errno` apres `recv`/`send`.
-- [ ] Eviter les boucles read/write jusqu'a `EAGAIN`; traiter une quantite bornee par event.
+- [x] Eviter les boucles read/write jusqu'a `EAGAIN`; traiter une quantite bornee par event.
 - [x] Gerer les envois partiels:
   - garder le reste dans `out_buffer`.
   - laisser `EPOLLOUT` actif tant que le buffer n'est pas vide.

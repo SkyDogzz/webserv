@@ -13,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <sys/epoll.h>
+#include <unistd.h>
 #include <vector>
 
 static bool requestComplete(const std::string& buffer, size_t& body_start, size_t& content_length)
@@ -92,9 +93,9 @@ void EventLoop::run()
         listen_map[listens[i].getFd()] = i;
     }
 
-    int epfd = epoll_create1(0);
+    int epfd = epoll_create(1);
     if (epfd == -1) {
-        std::cerr << "epoll_create1 failed: " << std::strerror(errno) << std::endl;
+        std::cerr << "epoll_create failed: " << std::strerror(errno) << std::endl;
         return;
     }
 
@@ -199,4 +200,5 @@ void EventLoop::run()
             }
         }
     }
+    close(epfd);
 }

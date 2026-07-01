@@ -1,9 +1,9 @@
 #ifndef LOCATIONCONFIG_HPP
 #define LOCATIONCONFIG_HPP
 
-#include <string>
-#include <set>
 #include <map>
+#include <set>
+#include <string>
 
 /*
     LocationConfig
@@ -21,6 +21,9 @@
 
 class LocationConfig {
 public:
+    explicit LocationConfig();
+    ~LocationConfig();
+
     std::string path;
 
     std::set<std::string> allowed_methods;
