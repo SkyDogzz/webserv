@@ -19,6 +19,7 @@
 #include <string>
 #include <set>
 #include <sys/epoll.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <vector>
 
@@ -271,6 +272,35 @@ static bool isMethodAllowed(const RequestContext& context, const std::string& me
     return context.allowed_methods.find(method) != context.allowed_methods.end();
 }
 
+static long currentTimeMs()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return static_cast<long>(tv.tv_sec) * 1000L + static_cast<long>(tv.tv_usec / 1000L);
+}
+
+static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd);
+
+static void expireTimedOutConnections(int epfd, std::map<int, Connection>& conns)
+{
+    const long header_timeout_ms = 15000;
+    const long body_timeout_ms = 15000;
+    const long idle_timeout_ms = 30000;
+    const long now_ms = currentTimeMs();
+
+    std::vector<int> expired;
+    for (std::map<int, Connection>::iterator it = conns.begin(); it != conns.end(); ++it) {
+        if (it->second.isHeaderTimedOut(now_ms, header_timeout_ms)
+            || it->second.isBodyTimedOut(now_ms, body_timeout_ms)
+            || it->second.isIdleTimedOut(now_ms, idle_timeout_ms)) {
+            expired.push_back(it->first);
+        }
+    }
+
+    for (std::size_t i = 0; i < expired.size(); ++i)
+        closeConnection(epfd, conns, expired[i]);
+}
+
 static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
 {
     epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
@@ -311,6 +341,7 @@ void EventLoop::run()
     const Config* config = WebServer::getInstance().getConfig();
 
     while (WebServer::getInstance().isRunning()) {
+        expireTimedOutConnections(epfd, conns);
         struct epoll_event events[64];
         int n = epoll_wait(epfd, events, 64, -1);
         if (n == -1) {
@@ -353,6 +384,7 @@ void EventLoop::run()
                     closeConnection(epfd, conns, fd);
                     continue;
                 }
+                conn.markActivity();
 
                 size_t body_start = 0;
                 size_t content_length = 0;
@@ -381,6 +413,8 @@ void EventLoop::run()
                     conn.setKeepAlive(keep_alive);
                     if (!keep_alive)
                         conn.markCloseAfterWrite();
+                    else
+                        conn.markRequestStart();
 
                     if (!ok) {
                         HttpResponse response = buildErrorResponse(400, keep_alive, NULL);
@@ -432,6 +466,7 @@ void EventLoop::run()
                     closeConnection(epfd, conns, fd);
                     continue;
                 }
+                conn.markActivity();
                 conn.modEpoll(epfd, conn.wantsWrite());
                 if (conn.shouldCloseAfterWrite()) {
                     closeConnection(epfd, conns, fd);
