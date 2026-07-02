@@ -5,14 +5,14 @@
 #include <iostream>
 #include <sstream>
 
-StaticHandler::StaticHandler(const std::string& root)
-    : root_(root)
+StaticHandler::StaticHandler(const RequestContext& context)
+    : context_(context)
 {
 }
 
 bool StaticHandler::isPathTraversal(const std::string& uri) const { return uri.find("..") != std::string::npos; }
 
-std::string StaticHandler::buildPath(const std::string& uri) const
+std::string StaticHandler::buildPath(const std::string& uri, const std::string& index) const
 {
     std::string path = uri;
     std::size_t query_pos = path.find('?');
@@ -21,11 +21,11 @@ std::string StaticHandler::buildPath(const std::string& uri) const
     if (!path.empty() && path[0] == '/')
         path.erase(0, 1);
     if (path.empty() || path[path.size() - 1] == '/')
-        path += "index.html";
+        path += index.empty() ? "index.html" : index;
 
-    if (!root_.empty() && root_[root_.size() - 1] == '/')
-        return root_ + path;
-    return root_ + "/" + path;
+    if (!context_.root.empty() && context_.root[context_.root.size() - 1] == '/')
+        return context_.root + path;
+    return context_.root + "/" + path;
 }
 
 std::string StaticHandler::guessMimeType(const std::string& path) const
@@ -67,7 +67,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
         return HttpResponse::makeError(403, false);
     }
 
-    std::string file_path = buildPath(request.path);
+    std::string file_path = buildPath(request.path, context_.index);
     DEBUG_LOG << "try path: \"" << file_path << "\"" << std::endl;
     std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
@@ -83,6 +83,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
     std::ostringstream len;
     len << body.size();
     response.headers["Content-Length"] = len.str();
+    response.headers["Connection"] = "close";
 
     if (request.method != "HEAD")
         response.body = body;

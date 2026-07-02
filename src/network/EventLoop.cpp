@@ -272,6 +272,13 @@ static HttpResponse buildErrorResponse(int status_code, bool keep_alive, const R
     return response;
 }
 
+static bool isMethodAllowed(const RequestContext& context, const std::string& method)
+{
+    if (context.allowed_methods.empty())
+        return method == "GET" || method == "HEAD";
+    return context.allowed_methods.find(method) != context.allowed_methods.end();
+}
+
 static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
 {
     epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
@@ -399,23 +406,25 @@ void EventLoop::run()
                             Router router(*config);
                             RequestContext context;
                             if (router.resolve(listen_port, request, context)) {
-                                bool method_allowed = context.allowed_methods.empty()
-                                    ? (request.method == "GET" || request.method == "HEAD")
-                                    : (context.allowed_methods.find(request.method) != context.allowed_methods.end());
-                                if (!method_allowed) {
+                                size_t max_body = context.server != NULL ? context.server->client_max_body_size : 0;
+                                if (max_body > 0 && request.body.size() > max_body) {
+                                    response = buildErrorResponse(413, keep_alive, &context);
+                                } else if (!isMethodAllowed(context, request.method)) {
                                     response = buildErrorResponse(405, keep_alive, &context);
                                 } else {
-                                    StaticHandler staticHandler(context.root);
+                                    StaticHandler staticHandler(context);
                                     response = staticHandler.handle(request);
                                     response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                                 }
                             } else {
-                                StaticHandler staticHandler("./");
+                                RequestContext fallback;
+                                StaticHandler staticHandler(fallback);
                                 response = staticHandler.handle(request);
                                 response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                             }
                         } else {
-                            StaticHandler staticHandler("./");
+                            RequestContext fallback;
+                            StaticHandler staticHandler(fallback);
                             response = staticHandler.handle(request);
                             response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                         }

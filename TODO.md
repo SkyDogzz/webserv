@@ -283,7 +283,7 @@ Validation:
 
 Objectif: servir un site statique complet.
 
-- [ ] Remplacer root hardcode `./` par root effectif du routing.
+- [x] Remplacer root hardcode `./` par root effectif du routing.
 - [~] Utiliser `stat` pour distinguer:
   - fichier.
   - dossier.
@@ -298,7 +298,7 @@ Objectif: servir un site statique complet.
   - normaliser path.
   - verifier que le chemin final reste sous root.
 - [x] Supporter GET.
-- [~] Decider si HEAD est supporte; si oui, l'ajouter proprement au parser/methods.
+- [x] Decider si HEAD est supporte; si oui, l'ajouter proprement au parser/methods.
 - [x] Lire fichiers regulierement sans poll, autorise par le sujet.
 - [x] Gerer fichiers binaires sans corruption.
 
@@ -326,8 +326,8 @@ Objectif: couvrir les methodes obligatoires du sujet.
   - si `unlink` non autorise dans votre version, revoir strategie avec evaluateurs/sujet local.
   - retourner 204 si suppression OK.
   - retourner 404 si absent, 403 si interdit.
-- [ ] Appliquer `methods` par location avant handler.
-- [ ] Appliquer `client_max_body_size` avant d'accumuler un body trop gros.
+- [x] Appliquer `methods` par location avant handler.
+- [x] Appliquer `client_max_body_size` avant d'accumuler un body trop gros.
 
 Validation:
 

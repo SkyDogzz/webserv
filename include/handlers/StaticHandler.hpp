@@ -2,18 +2,19 @@
 #define STATICHANDLER_HPP
 
 #include "handlers/IHandler.hpp"
+#include "../core/Router.hpp"
 #include <string>
 
 class StaticHandler : public IHandler {
 public:
-    explicit StaticHandler(const std::string& root);
+    explicit StaticHandler(const RequestContext& context);
     virtual ~StaticHandler() { }
     virtual HttpResponse handle(const HttpRequest& request);
 
 private:
-    std::string root_;
+    RequestContext context_;
 
-    std::string buildPath(const std::string& uri) const;
+    std::string buildPath(const std::string& uri, const std::string& index) const;
     std::string guessMimeType(const std::string& path) const;
     bool isPathTraversal(const std::string& uri) const;
 };
