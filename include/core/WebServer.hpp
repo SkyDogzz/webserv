@@ -26,6 +26,7 @@ private:
     WebServer& operator=(const WebServer& other);
 
     bool _running;
+    Config* _config;
     EventLoop _event_loop;
 
     static void sigintHandler(int signal);
@@ -35,6 +36,7 @@ public:
 
     static WebServer& getInstance();
     void appliConfig(Config& config);
+    const Config* getConfig() const;
     void run();
     bool isRunning();
 };
