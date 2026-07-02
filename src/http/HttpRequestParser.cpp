@@ -2,6 +2,7 @@
 #include "../../include/utils/DebugLogger.hpp"
 #include "../../include/utils/Utils.hpp"
 #include <cctype>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <utility>
@@ -16,6 +17,57 @@ static bool isValidHeaderName(const std::string& name)
             return false;
     }
     return true;
+}
+
+static bool parseStrictSize(const std::string& value, std::size_t& out)
+{
+    std::string trimmed = Utils::trimCopy(value);
+    if (trimmed.empty())
+        return false;
+
+    out = 0;
+    for (std::size_t i = 0; i < trimmed.size(); ++i) {
+        char c = trimmed[i];
+        if (c < '0' || c > '9')
+            return false;
+        std::size_t digit = static_cast<std::size_t>(c - '0');
+        if (out > (static_cast<std::size_t>(-1) - digit) / 10)
+            return false;
+        out = out * 10 + digit;
+    }
+    return true;
+}
+
+static void splitTarget(const std::string& target, std::string& path, std::string& query)
+{
+    std::string value = target;
+    if (value.empty())
+        value = "/";
+
+    std::size_t question = value.find('?');
+    if (question == std::string::npos) {
+        path = value;
+        query.clear();
+    } else {
+        path = value.substr(0, question);
+        query = value.substr(question + 1);
+    }
+
+    if (path.empty())
+        path = "/";
+
+    path = Utils::percentDecodeCopy(path);
+    query = Utils::percentDecodeCopy(query);
+}
+
+static bool parseConnectionPreference(const std::string& value, bool default_keep_alive)
+{
+    std::string lower = Utils::toLowerCopy(Utils::trimCopy(value));
+    if (lower.find("close") != std::string::npos)
+        return false;
+    if (lower.find("keep-alive") != std::string::npos)
+        return true;
+    return default_keep_alive;
 }
 
 static bool parseChunkSizeLine(const std::string& line, std::size_t& chunk_size)
@@ -105,11 +157,11 @@ static bool consumeChunkedBody(const std::string& body, std::string* decoded_bod
     }
 }
 
-bool validStartLine(HttpRequest& request)
+static bool validStartLine(const HttpRequest& request)
 {
-    if (request.method != "GET" && request.method != "POST" && request.method != "DELETE")
+    if (request.method != "GET" && request.method != "POST" && request.method != "DELETE" && request.method != "HEAD")
         return false;
-    if (request.version != "HTTP/1.1")
+    if (request.version != "HTTP/1.0" && request.version != "HTTP/1.1")
         return false;
     return true;
 }
@@ -119,13 +171,16 @@ bool parseStartLine(const std::string& line, HttpRequest& request)
     DEBUG_LOG << line << std::endl;
     std::string trimmed = Utils::trimCopy(line);
     std::istringstream iss(trimmed);
-    if (!(iss >> request.method >> request.path >> request.version))
+    if (!(iss >> request.method >> request.target >> request.version))
         return false;
     std::string extra;
     if (iss >> extra)
         return false;
     if (!validStartLine(request))
         return false;
+    if (request.target.empty() || request.target[0] != '/')
+        return false;
+    splitTarget(request.target, request.path, request.query);
     return true;
 }
 
@@ -177,6 +232,7 @@ void printRequest(HttpRequest& request)
 
 bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
 {
+    request = HttpRequest();
     std::size_t pos = buffer.find('\n');
     if (pos == std::string::npos)
         return false;
@@ -208,6 +264,7 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
         if (!request.body.empty() && request.body[0] == '\r')
             request.body.erase(0, 1);
     }
+
     std::map<std::string, std::string>::const_iterator te = request.headers.find("transfer-encoding");
     if (te != request.headers.end()) {
         if (Utils::toLowerCopy(te->second) != "chunked")
@@ -218,7 +275,27 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
         if (!consumeChunkedBody(request.body, &decoded_body))
             throw HttpRequestParser::FirstLineInvalidException();
         request.body = decoded_body;
+    } else {
+        std::map<std::string, std::string>::const_iterator cl = request.headers.find("content-length");
+        if (cl != request.headers.end()) {
+            std::size_t expected = 0;
+            if (!parseStrictSize(cl->second, expected))
+                throw HttpRequestParser::FirstLineInvalidException();
+            if (request.body.size() != expected)
+                throw HttpRequestParser::FirstLineInvalidException();
+        } else if (!request.body.empty()) {
+            throw HttpRequestParser::FirstLineInvalidException();
+        }
     }
+
+    std::map<std::string, std::string>::const_iterator host = request.headers.find("host");
+    if (request.version == "HTTP/1.1" && (host == request.headers.end() || Utils::trimCopy(host->second).empty()))
+        throw HttpRequestParser::FirstLineInvalidException();
+
+    std::map<std::string, std::string>::const_iterator connection = request.headers.find("connection");
+    request.keep_alive = parseConnectionPreference(
+        connection == request.headers.end() ? "" : connection->second, request.version == "HTTP/1.1");
+
     printRequest(request);
     return true;
 }

@@ -63,6 +63,36 @@ std::string joinPathCopy(const std::string& base, const std::string& leaf)
     return joined + clean_leaf;
 }
 
+static int hexValue(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return 10 + (c - 'a');
+    if (c >= 'A' && c <= 'F')
+        return 10 + (c - 'A');
+    return -1;
+}
+
+std::string percentDecodeCopy(const std::string& value)
+{
+    std::string decoded;
+    decoded.reserve(value.size());
+    for (std::size_t i = 0; i < value.size(); ++i) {
+        if (value[i] == '%' && i + 2 < value.size()) {
+            int hi = hexValue(value[i + 1]);
+            int lo = hexValue(value[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                decoded.push_back(static_cast<char>((hi << 4) | lo));
+                i += 2;
+                continue;
+            }
+        }
+        decoded.push_back(value[i]);
+    }
+    return decoded;
+}
+
 bool hasPathTraversal(const std::string& value)
 {
     std::string path = stripQueryCopy(value);
