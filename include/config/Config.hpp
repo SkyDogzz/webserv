@@ -22,6 +22,8 @@ class Config {
 public:
     explicit Config(const std::string& filename);
 
+    void validate() const;
+
     std::vector<ServerConfig> servers;
 };
 

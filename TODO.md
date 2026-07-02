@@ -140,7 +140,7 @@ Validation:
 Objectif: respecter strictement le modele I/O du sujet.
 
 - [ ] Remplacer les listeners hardcodes de `EventLoop` par les `listen` issus de `Config`.
-- [ ] Gerer plusieurs `server` sur un meme port sans double bind inutile.
+- [x] Refuser plusieurs `server` sur un meme port au chargement de config.
 - [ ] Associer chaque fd listener a sa config server ou a un groupe de servers.
 - [x] Remplacer `epoll_create1(0)` par `epoll_create(size)` pour rester dans les fonctions autorisees.
 - [x] Garder un seul appel `epoll_wait` central pour toutes les I/O sockets.
@@ -158,6 +158,7 @@ Objectif: respecter strictement le modele I/O du sujet.
   - headers incomplets.
   - body incomplet.
   - idle keep-alive.
+- [x] Verifier que la config refuse les ports dupliques avant de lancer le serveur.
 - [~] Gerer `EPOLLHUP`, `EPOLLERR`, fermeture client, et cleanup sans fuite.
 - [x] Eviter que la suppression d'une connexion invalide l'iteration en cours.
 
