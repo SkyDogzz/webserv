@@ -1,17 +1,10 @@
 #include "../../include/http/HttpRequestParser.hpp"
 #include "../../include/utils/DebugLogger.hpp"
+#include "../../include/utils/Utils.hpp"
 #include <cctype>
 #include <iostream>
 #include <sstream>
 #include <utility>
-
-static std::string toLowerCopy(const std::string& value)
-{
-    std::string lower = value;
-    for (std::size_t i = 0; i < lower.size(); ++i)
-        lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lower[i])));
-    return lower;
-}
 
 static bool isValidHeaderName(const std::string& name)
 {
@@ -124,9 +117,7 @@ bool validStartLine(HttpRequest& request)
 bool parseStartLine(const std::string& line, HttpRequest& request)
 {
     DEBUG_LOG << line << std::endl;
-    std::string trimmed = line;
-    if (!trimmed.empty() && trimmed[trimmed.size() - 1] == '\r')
-        trimmed.erase(trimmed.size() - 1);
+    std::string trimmed = Utils::trimCopy(line);
     std::istringstream iss(trimmed);
     if (!(iss >> request.method >> request.path >> request.version))
         return false;
@@ -155,7 +146,7 @@ bool pushHeader(const std::string& line, HttpRequest& request)
     if (!value.empty() && value[value.size() - 1] == '\r')
         value.erase(value.size() - 1);
 
-    std::string normalized_key = toLowerCopy(key);
+    std::string normalized_key = Utils::toLowerCopy(key);
     if (normalized_key == "content-length" && request.headers.find(normalized_key) != request.headers.end())
         return false;
     if (normalized_key == "transfer-encoding" && request.headers.find(normalized_key) != request.headers.end())
@@ -219,7 +210,7 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
     }
     std::map<std::string, std::string>::const_iterator te = request.headers.find("transfer-encoding");
     if (te != request.headers.end()) {
-        if (toLowerCopy(te->second) != "chunked")
+        if (Utils::toLowerCopy(te->second) != "chunked")
             throw HttpRequestParser::FirstLineInvalidException();
         if (request.headers.find("content-length") != request.headers.end())
             throw HttpRequestParser::FirstLineInvalidException();

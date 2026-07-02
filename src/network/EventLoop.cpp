@@ -6,11 +6,11 @@
 #include "../../include/network/Connection.hpp"
 #include "../../include/network/ListeningSocket.hpp"
 #include "../../include/utils/DebugLogger.hpp"
+#include "../../include/utils/Utils.hpp"
 #include "handlers/StaticHandler.hpp"
 #include "http/HttpResponse.hpp"
 #include <cerrno>
 #include <cstdlib>
-#include <cctype>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -21,14 +21,6 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <vector>
-
-static std::string toLowerCopy(const std::string& value)
-{
-    std::string lower = value;
-    for (std::size_t i = 0; i < lower.size(); ++i)
-        lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lower[i])));
-    return lower;
-}
 
 static bool parseChunkSizeLine(const std::string& line, std::size_t& chunk_size)
 {
@@ -156,12 +148,12 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
         std::size_t colon = line.find(':');
         if (colon != std::string::npos) {
             std::string key = line.substr(0, colon);
-            std::string normalized_key = toLowerCopy(key);
+            std::string normalized_key = Utils::toLowerCopy(key);
             if (normalized_key == "transfer-encoding") {
                 std::size_t value_start = colon + 1;
                 if (value_start < line.size() && line[value_start] == ' ')
                     ++value_start;
-                std::string current_value = toLowerCopy(line.substr(value_start));
+                std::string current_value = Utils::toLowerCopy(line.substr(value_start));
                 if (current_value == "chunked")
                     saw_transfer_encoding = true;
             } else if (normalized_key == "content-length") {

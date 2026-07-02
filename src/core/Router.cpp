@@ -1,7 +1,5 @@
 #include "../../include/core/Router.hpp"
-
-#include <algorithm>
-#include <cctype>
+#include "../../include/utils/Utils.hpp"
 
 RequestContext::RequestContext()
     : server(NULL)
@@ -17,21 +15,13 @@ Router::Router(const Config& config)
 {
 }
 
-static std::string toLowerCopy(const std::string& value)
-{
-    std::string lower = value;
-    for (std::size_t i = 0; i < lower.size(); ++i)
-        lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lower[i])));
-    return lower;
-}
-
 std::string Router::hostWithoutPort(const std::string& host)
 {
     std::string value = host;
     std::string::size_type colon = value.find(':');
     if (colon != std::string::npos)
         value.erase(colon);
-    return toLowerCopy(value);
+    return Utils::toLowerCopy(value);
 }
 
 std::string Router::normalizePath(const std::string& path)
