@@ -1,23 +1,13 @@
 #include "../../include/network/ListeningSocket.hpp"
 #include "../../include/utils/DebugLogger.hpp"
+#include "../../include/utils/Utils.hpp"
 #include <cerrno>
 #include <cstring>
-#include <fcntl.h>
 #include <iostream>
 #include <netdb.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-static bool makeNonBlocking(int fd)
-{
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1)
-        return false;
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-        return false;
-    return true;
-}
 
 ListeningSocket::ListeningSocket()
     : fd(-1)
@@ -105,7 +95,7 @@ bool ListeningSocket::open(const std::string& host, const std::string& port, int
                 close(socket_fd);
                 continue;
             }
-            makeNonBlocking(socket_fd);
+            Utils::makeNonBlocking(socket_fd);
             fd = socket_fd;
             DEBUG_LOG << "Listening on " << (gni == 0 ? hostbuf : "*") << ":" << (gni == 0 ? servbuf : port)
                       << " fd=" << fd << std::endl;
@@ -128,7 +118,7 @@ int ListeningSocket::acceptClient() const
         return -1;
     if (client_fd == -1)
         return -1;
-    makeNonBlocking(client_fd);
+    Utils::makeNonBlocking(client_fd);
     return client_fd;
 }
 

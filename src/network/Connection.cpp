@@ -1,19 +1,9 @@
 #include "../../include/network/Connection.hpp"
+#include "../../include/utils/Utils.hpp"
 #include <cstring>
-#include <fcntl.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-static bool makeNonBlocking(int fd)
-{
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1)
-        return false;
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-        return false;
-    return true;
-}
 
 Connection::Connection()
     : fd(-1)
@@ -29,24 +19,22 @@ Connection::Connection(int fd, int listen_fd)
     , keep_alive(false)
     , close_after_write(false)
 {
-    makeNonBlocking(fd);
+    Utils::makeNonBlocking(fd);
 }
 
 void Connection::init(int fd, int listen_fd)
 {
-    if (this->fd != -1)
-        close(this->fd);
+    Utils::closeFdSafe(this->fd);
     this->fd = fd;
     this->listen_fd = listen_fd;
     keep_alive = false;
     close_after_write = false;
-    makeNonBlocking(fd);
+    Utils::makeNonBlocking(fd);
 }
 
 Connection::~Connection()
 {
-    if (fd != -1)
-        close(fd);
+    Utils::closeFdSafe(fd);
 }
 
 int Connection::getFd() const { return fd; }
