@@ -12,10 +12,12 @@
 #include <cstdlib>
 #include <cctype>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <string>
+#include <set>
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <vector>
@@ -215,16 +217,59 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
     return buffer.size() >= body_start + content_length;
 }
 
-static std::string buildSimpleResponse(int status_code, const std::string& body, bool keep_alive)
+static std::string joinAllowHeader(const RequestContext& context)
 {
     std::ostringstream out;
-    out << "HTTP/1.1 " << status_code << " " << httpReasonPhrase(status_code) << "\r\n";
-    out << "Content-Type: text/plain\r\n";
-    out << "Content-Length: " << body.size() << "\r\n";
-    out << "Connection: " << (keep_alive ? "keep-alive" : "close") << "\r\n";
-    out << "\r\n";
-    out << body;
+    bool first = true;
+    if (context.allowed_methods.empty()) {
+        out << "GET, HEAD";
+        return out.str();
+    }
+    for (std::set<std::string>::const_iterator it = context.allowed_methods.begin(); it != context.allowed_methods.end();
+         ++it) {
+        if (!first)
+            out << ", ";
+        out << *it;
+        first = false;
+    }
     return out.str();
+}
+
+static bool readWholeFile(const std::string& path, std::string& content)
+{
+    std::ifstream file(path.c_str(), std::ios::in | std::ios::binary);
+    if (!file)
+        return false;
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    content = buffer.str();
+    return true;
+}
+
+static HttpResponse buildErrorResponse(int status_code, bool keep_alive, const RequestContext* context)
+{
+    HttpResponse response = HttpResponse::makeError(status_code, keep_alive);
+    response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
+
+    if (status_code == 405 && context != NULL) {
+        response.headers["Allow"] = joinAllowHeader(*context);
+    }
+
+    if (context != NULL) {
+        std::map<int, std::string>::const_iterator it = context->error_pages.find(status_code);
+        if (it != context->error_pages.end()) {
+            std::string custom_body;
+            if (readWholeFile(it->second, custom_body)) {
+                response.body = custom_body;
+                response.headers["Content-Type"] = "text/html";
+                std::ostringstream len;
+                len << response.body.size();
+                response.headers["Content-Length"] = len.str();
+            }
+        }
+    }
+
+    return response;
 }
 
 static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
@@ -338,9 +383,10 @@ void EventLoop::run()
                     if (!keep_alive)
                         conn.markCloseAfterWrite();
 
-                    if (!ok)
-                        conn.out_buffer = buildSimpleResponse(400, httpReasonPhrase(400), keep_alive);
-                    else {
+                    if (!ok) {
+                        HttpResponse response = buildErrorResponse(400, keep_alive, NULL);
+                        conn.out_buffer = response.toString();
+                    } else {
                         HttpResponse response;
                         response.status_code = 500;
 
@@ -353,21 +399,25 @@ void EventLoop::run()
                             Router router(*config);
                             RequestContext context;
                             if (router.resolve(listen_port, request, context)) {
-                                if (!context.allowed_methods.empty()
-                                    && context.allowed_methods.find(request.method) == context.allowed_methods.end()) {
-                                    response.status_code = 405;
-                                    response.body = httpReasonPhrase(405);
+                                bool method_allowed = context.allowed_methods.empty()
+                                    ? (request.method == "GET" || request.method == "HEAD")
+                                    : (context.allowed_methods.find(request.method) != context.allowed_methods.end());
+                                if (!method_allowed) {
+                                    response = buildErrorResponse(405, keep_alive, &context);
                                 } else {
                                     StaticHandler staticHandler(context.root);
                                     response = staticHandler.handle(request);
+                                    response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                                 }
                             } else {
                                 StaticHandler staticHandler("./");
                                 response = staticHandler.handle(request);
+                                response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                             }
                         } else {
                             StaticHandler staticHandler("./");
                             response = staticHandler.handle(request);
+                            response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                         }
 
                         conn.out_buffer = response.toString();
