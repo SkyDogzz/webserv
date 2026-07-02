@@ -47,8 +47,7 @@ ListeningSocket& ListeningSocket::operator=(const ListeningSocket& other)
 
 ListeningSocket::~ListeningSocket()
 {
-    if (fd != -1)
-        close(fd);
+    closeSocket();
 }
 
 bool ListeningSocket::open(const std::string& host, const std::string& port, int backlog)
@@ -131,8 +130,16 @@ bool ListeningSocket::addToEpoll(int epfd) const
     return epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == 0;
 }
 
+void ListeningSocket::closeSocket()
+{
+    Utils::closeFdSafe(fd);
+    fd = -1;
+}
+
 int ListeningSocket::getFd() const { return fd; }
 
 std::string ListeningSocket::getHost() const { return host_; }
 
 std::string ListeningSocket::getPort() const { return port_; }
+
+bool ListeningSocket::isOpen() const { return fd != -1; }

@@ -159,7 +159,7 @@ Objectif: respecter strictement le modele I/O du sujet.
   - body incomplet.
   - idle keep-alive.
 - [x] Verifier que la config refuse les ports dupliques avant de lancer le serveur.
-- [~] Gerer `EPOLLHUP`, `EPOLLERR`, fermeture client, et cleanup sans fuite.
+- [x] Gerer `EPOLLHUP`, `EPOLLERR`, fermeture client, et cleanup sans fuite.
 - [x] Eviter que la suppression d'une connexion invalide l'iteration en cours.
 
 Validation:
