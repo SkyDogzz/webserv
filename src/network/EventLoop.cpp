@@ -286,8 +286,7 @@ static HttpResponse buildErrorResponse(int status_code, bool keep_alive, const R
 
 static void finalizeResponse(HttpResponse& response, const HttpRequest& request, bool keep_alive)
 {
-    if (response.headers.find("Connection") == response.headers.end())
-        response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
+    response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
 
     if (response.status_code == 204) {
         response.body.clear();

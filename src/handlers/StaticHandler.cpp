@@ -2,7 +2,12 @@
 #include "../../include/http/HttpStatus.hpp"
 #include "../../include/utils/DebugLogger.hpp"
 #include "../../include/utils/Utils.hpp"
+#include <cerrno>
+#include <cstdio>
+#include <ctime>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -12,14 +17,21 @@ StaticHandler::StaticHandler(const RequestContext& context)
 {
 }
 
-std::string StaticHandler::buildPath(const std::string& uri, const std::string& index) const
+std::string StaticHandler::buildFilesystemPath(const std::string& uri) const
+{
+    std::string path = Utils::stripQueryCopy(uri);
+    if (path.empty())
+        path = "/";
+    return Utils::joinPathCopy(context_.root, path);
+}
+
+std::string StaticHandler::buildGetPath(const std::string& uri, const std::string& index) const
 {
     std::string path = Utils::stripQueryCopy(uri);
     if (path.empty())
         path = "/";
     if (path[path.size() - 1] == '/')
         path = Utils::joinPathCopy(path, index.empty() ? "index.html" : index);
-
     return Utils::joinPathCopy(context_.root, path);
 }
 
@@ -74,6 +86,22 @@ HttpResponse StaticHandler::makeErrorResponse(int status_code) const
     return response;
 }
 
+std::string StaticHandler::makeUploadFilename(const std::string& hint) const
+{
+    static unsigned long counter = 0;
+    std::ostringstream out;
+    out << "upload_" << static_cast<long>(::getpid()) << "_" << static_cast<long>(::time(NULL)) << "_"
+        << counter++;
+
+    std::size_t dot = hint.rfind('.');
+    if (dot != std::string::npos && dot + 1 < hint.size()) {
+        std::string ext = hint.substr(dot);
+        if (ext.size() <= 16)
+            out << ext;
+    }
+    return out.str();
+}
+
 std::string StaticHandler::guessMimeType(const std::string& path) const
 {
     std::size_t dot = path.rfind('.');
@@ -116,37 +144,49 @@ std::string StaticHandler::guessMimeType(const std::string& path) const
 
 HttpResponse StaticHandler::handle(const HttpRequest& request)
 {
+    if (request.method == "GET" || request.method == "HEAD")
+        return handleGetOrHead(request);
+    if (request.method == "POST")
+        return handlePost(request);
+    if (request.method == "DELETE")
+        return handleDelete(request);
+    return makeErrorResponse(405);
+}
+
+HttpResponse StaticHandler::handleGetOrHead(const HttpRequest& request) const
+{
     HttpResponse response;
     response.status_code = 200;
 
-    if (request.method != "GET" && request.method != "HEAD") {
-        return makeErrorResponse(405);
-    }
-
-    if (Utils::hasPathTraversal(request.path)) {
+    if (Utils::hasPathTraversal(request.path))
         return makeErrorResponse(403);
-    }
 
     if (!context_.redirect_url.empty()) {
         int redirect_code = context_.redirect_code != 0 ? context_.redirect_code : 301;
         return HttpResponse::makeRedirect(redirect_code, context_.redirect_url, false);
     }
 
-    std::string base_path = Utils::joinPathCopy(context_.root, request.path);
+    std::string base_path = buildFilesystemPath(request.path);
     struct stat st;
     if (stat(base_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode) && !request.path.empty()
         && request.path[request.path.size() - 1] != '/') {
         return HttpResponse::makeRedirect(301, buildRedirectLocation(request.target), false);
     }
 
-    std::string file_path = buildPath(request.path, context_.index);
+    std::string file_path = buildGetPath(request.path, context_.index);
     DEBUG_LOG << "try path: \"" << file_path << "\"" << std::endl;
-    if (stat(file_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) {
+    if (stat(file_path.c_str(), &st) != 0) {
+        if (errno == EACCES || errno == EPERM)
+            return makeErrorResponse(403);
         return makeErrorResponse(404);
     }
+    if (!S_ISREG(st.st_mode))
+        return makeErrorResponse(403);
 
     std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
+        if (errno == EACCES || errno == EPERM)
+            return makeErrorResponse(403);
         return makeErrorResponse(404);
     }
 
@@ -154,7 +194,6 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
     buffer << file.rdbuf();
     std::string body = buffer.str();
     response.headers["Content-Type"] = guessMimeType(file_path);
-    DEBUG_LOG << response.headers["Content-Type"] << std::endl;
 
     std::ostringstream len;
     len << body.size();
@@ -162,7 +201,62 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
 
     if (request.method != "HEAD")
         response.body = body;
-    DEBUG_LOG << "request: " << std::endl;
-    DEBUG_LOG << response.toString() << std::endl;
+    return response;
+}
+
+HttpResponse StaticHandler::handlePost(const HttpRequest& request) const
+{
+    if (context_.upload_dir.empty())
+        return HttpResponse::makeError(501, false);
+    if (Utils::hasPathTraversal(request.path))
+        return makeErrorResponse(403);
+
+    struct stat st;
+    if (stat(context_.upload_dir.c_str(), &st) != 0)
+        return makeErrorResponse(403);
+    if (!S_ISDIR(st.st_mode))
+        return makeErrorResponse(403);
+
+    std::string filename = makeUploadFilename(request.path);
+    std::string full_path = Utils::joinPathCopy(context_.upload_dir, filename);
+    std::ofstream file(full_path.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!file) {
+        if (errno == EACCES || errno == EPERM)
+            return makeErrorResponse(403);
+        return HttpResponse::makeError(500, false);
+    }
+
+    file.write(request.body.c_str(), request.body.size());
+    if (!file.good())
+        return HttpResponse::makeError(500, false);
+
+    HttpResponse response = HttpResponse::makeText(201, "<html><body><h1>Created</h1></body></html>", "text/html", false);
+    response.headers["Location"] = Utils::joinPathCopy(request.path, filename);
+    return response;
+}
+
+HttpResponse StaticHandler::handleDelete(const HttpRequest& request) const
+{
+    if (Utils::hasPathTraversal(request.path))
+        return makeErrorResponse(403);
+
+    std::string file_path = buildFilesystemPath(request.path);
+    struct stat st;
+    if (stat(file_path.c_str(), &st) != 0)
+        return makeErrorResponse(404);
+    if (S_ISDIR(st.st_mode))
+        return makeErrorResponse(403);
+    if (unlink(file_path.c_str()) != 0) {
+        if (errno == ENOENT)
+            return makeErrorResponse(404);
+        if (errno == EACCES || errno == EPERM)
+            return makeErrorResponse(403);
+        return HttpResponse::makeError(500, false);
+    }
+
+    HttpResponse response;
+    response.status_code = 204;
+    response.headers["Connection"] = "close";
+    response.headers["Content-Length"] = "0";
     return response;
 }
