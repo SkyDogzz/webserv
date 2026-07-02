@@ -281,6 +281,18 @@ static long currentTimeMs()
 
 static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd);
 
+static void closeListeningSocket(
+    int epfd, std::vector<ListeningSocket>& listens, std::map<int, size_t>& listen_map, int fd)
+{
+    std::map<int, size_t>::iterator it = listen_map.find(fd);
+    if (it == listen_map.end())
+        return;
+
+    epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+    listens[it->second].closeSocket();
+    listen_map.erase(it);
+}
+
 static void expireTimedOutConnections(int epfd, std::map<int, Connection>& conns)
 {
     const long header_timeout_ms = 15000;
@@ -342,6 +354,8 @@ void EventLoop::run()
 
     while (WebServer::getInstance().isRunning()) {
         expireTimedOutConnections(epfd, conns);
+        if (listen_map.empty() && conns.empty())
+            break;
         struct epoll_event events[64];
         int n = epoll_wait(epfd, events, 64, -1);
         if (n == -1) {
@@ -355,6 +369,10 @@ void EventLoop::run()
             int fd = events[i].data.fd;
 
             if (listen_map.find(fd) != listen_map.end()) {
+                if (events[i].events & (EPOLLHUP | EPOLLERR)) {
+                    closeListeningSocket(epfd, listens, listen_map, fd);
+                    continue;
+                }
                 ListeningSocket& listen = listens[listen_map[fd]];
                 for (;;) {
                     int client_fd = listen.acceptClient();
