@@ -26,6 +26,7 @@ public:
 
     static HttpResponse makeText(int status_code, const std::string& body, const std::string& content_type,
         bool keep_alive);
+    static HttpResponse makeRedirect(int status_code, const std::string& location, bool keep_alive);
     static HttpResponse makeError(int status_code, bool keep_alive);
 
     std::string toString() const;

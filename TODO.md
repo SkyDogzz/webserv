@@ -262,16 +262,16 @@ Objectif: produire des reponses correctes, completes et coherentes.
   - 501 Not Implemented
   - 504 Gateway Timeout si CGI timeout.
 - [x] Ne pas encoder `Connection` via un faux header `keep-alive`.
-- [~] Respecter les headers fournis par les handlers.
+- [x] Respecter les headers fournis par les handlers.
 - [ ] Ajouter `Date` si souhaite, sinon garder minimal.
 - [x] Ajouter `Allow` sur 405.
-- [ ] Ajouter `Location` sur redirect.
+- [x] Ajouter `Location` sur redirect.
 - [x] Implementer default error pages HTML si aucune page configuree.
-- [~] Servir les `error_page` configurees si disponibles.
-- [~] Eviter de recalculer un Content-Length faux:
+- [x] Servir les `error_page` configurees si disponibles.
+- [x] Eviter de recalculer un Content-Length faux:
   - body vide pour 204.
   - body absent pour HEAD si HEAD supporte.
-- [~] Gerer MIME types de facon plus complete.
+- [x] Gerer MIME types de facon plus complete.
 
 Validation:
 

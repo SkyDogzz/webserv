@@ -16,6 +16,8 @@ private:
 
     std::string buildPath(const std::string& uri, const std::string& index) const;
     std::string guessMimeType(const std::string& path) const;
+    std::string buildRedirectLocation(const std::string& target) const;
+    HttpResponse makeErrorResponse(int status_code) const;
 };
 
 #endif

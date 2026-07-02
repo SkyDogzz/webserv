@@ -7,6 +7,8 @@ RequestContext::RequestContext()
     , root(".")
     , index("index.html")
     , autoindex(false)
+    , redirect_code(0)
+    , redirect_url("")
 {
 }
 
@@ -85,6 +87,8 @@ bool Router::resolve(int listen_port, const HttpRequest& request, RequestContext
         if (!location->index.empty())
             context.index = location->index;
         context.autoindex = location->autoindex;
+        context.redirect_code = location->redirect_code;
+        context.redirect_url = location->redirect_url;
         context.allowed_methods = location->allowed_methods;
         context.cgi = location->cgi;
         context.error_pages = server->error_pages;
