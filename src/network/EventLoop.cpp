@@ -1,5 +1,6 @@
 #include "../../include/network/EventLoop.hpp"
 #include "../../include/core/WebServer.hpp"
+#include "../../include/core/Router.hpp"
 #include "../../include/http/HttpRequestParser.hpp"
 #include "../../include/http/HttpStatus.hpp"
 #include "../../include/network/Connection.hpp"
@@ -8,6 +9,7 @@
 #include "handlers/StaticHandler.hpp"
 #include "http/HttpResponse.hpp"
 #include <cerrno>
+#include <cstdlib>
 #include <cctype>
 #include <cstring>
 #include <iostream>
@@ -262,6 +264,7 @@ void EventLoop::run()
         listens[i].addToEpoll(epfd);
 
     std::map<int, Connection> conns;
+    const Config* config = WebServer::getInstance().getConfig();
 
     while (WebServer::getInstance().isRunning()) {
         struct epoll_event events[64];
@@ -338,8 +341,35 @@ void EventLoop::run()
                     if (!ok)
                         conn.out_buffer = buildSimpleResponse(400, httpReasonPhrase(400), keep_alive);
                     else {
-                        StaticHandler staticHandler("./");
-                        HttpResponse response = staticHandler.handle(request);
+                        HttpResponse response;
+                        response.status_code = 500;
+
+                        if (config != NULL && !config->servers.empty()) {
+                            std::map<int, size_t>::const_iterator listen_it = listen_map.find(conn.getListenFd());
+                            int listen_port = 0;
+                            if (listen_it != listen_map.end())
+                                listen_port = std::atoi(listens[listen_it->second].getPort().c_str());
+
+                            Router router(*config);
+                            RequestContext context;
+                            if (router.resolve(listen_port, request, context)) {
+                                if (!context.allowed_methods.empty()
+                                    && context.allowed_methods.find(request.method) == context.allowed_methods.end()) {
+                                    response.status_code = 405;
+                                    response.body = httpReasonPhrase(405);
+                                } else {
+                                    StaticHandler staticHandler(context.root);
+                                    response = staticHandler.handle(request);
+                                }
+                            } else {
+                                StaticHandler staticHandler("./");
+                                response = staticHandler.handle(request);
+                            }
+                        } else {
+                            StaticHandler staticHandler("./");
+                            response = staticHandler.handle(request);
+                        }
+
                         conn.out_buffer = response.toString();
                     }
                     conn.modEpoll(epfd, true);

@@ -11,6 +11,7 @@ void WebServer::sigintHandler(int signal)
 
 WebServer::WebServer()
     : _running(true)
+    , _config(NULL)
 {
     signal(SIGINT, &WebServer::sigintHandler);
 }
@@ -23,7 +24,9 @@ WebServer& WebServer::getInstance()
     return _instance;
 }
 
-void WebServer::appliConfig(Config& config) { (void)config; }
+void WebServer::appliConfig(Config& config) { _config = &config; }
+
+const Config* WebServer::getConfig() const { return _config; }
 
 void WebServer::run() { _event_loop.run(); }
 

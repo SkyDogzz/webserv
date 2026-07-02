@@ -7,13 +7,13 @@ Le depot contient une base minimale de serveur HTTP:
 - Makefile qui compile `src/**/*.cpp` en `webserv` avec `-Wall -Wextra -Werror -std=c++98`.
 - `main.cpp` impose un argument de configuration, mais la configuration est ignoree.
 - `Config`, `ServerConfig`, `LocationConfig` existent surtout comme structures de donnees, sans parsing.
-- `EventLoop` utilise `epoll` et cree deux ports en dur: `8080` et `8081`.
+- `EventLoop` utilise `epoll` et cree encore deux ports en dur: `8080` et `8081`.
 - `ListeningSocket` ouvre des sockets TCP, bind/listen, et les passe en non-bloquant.
 - `Connection` gere un fd client avec buffers `in_buffer` et `out_buffer`.
 - `HttpRequestParser` parse une requete HTTP tres simple, avec headers normalises en minuscules, rejet des `Content-Length` dupliques, et support du `Transfer-Encoding: chunked`.
 - `HttpResponse` serialise une reponse basique.
 - `StaticHandler` sert des fichiers statiques depuis `./`.
-- `Router` est declare mais non implemente/utilise.
+- `Router` est commence et branche de facon minimale pour la selection server/location.
 - `server.cpp` et `client.cpp` sont des essais UDP hors build.
 - `README.md`, fichiers de config de demo, error pages, tests et CGI sont absents.
 
@@ -218,13 +218,13 @@ Validation:
 
 Objectif: choisir la bonne configuration effective pour chaque requete.
 
-- [ ] Implementer `Router`.
-- [ ] Selectionner le `ServerConfig` depuis:
+- [x] Implementer `Router`.
+- [x] Selectionner le `ServerConfig` depuis:
   - fd listener ou port local.
   - header `Host` si virtual host implemente.
   - premier server du couple host:port comme default server.
-- [ ] Matcher la meilleure `LocationConfig` par prefixe le plus long.
-- [ ] Fusionner config server + location:
+- [x] Matcher la meilleure `LocationConfig` par prefixe le plus long.
+- [~] Fusionner config server + location:
   - root.
   - index.
   - methods.
@@ -234,8 +234,8 @@ Objectif: choisir la bonne configuration effective pour chaque requete.
   - redirection.
   - error_pages.
   - client_max_body_size.
-- [ ] Normaliser les paths pour eviter les traversals.
-- [ ] Preparer un objet `RequestContext` donne aux handlers.
+- [x] Normaliser les paths pour eviter les traversals.
+- [x] Preparer un objet `RequestContext` donne aux handlers.
 
 Validation:
 
