@@ -1,8 +1,29 @@
 #include "../../include/http/HttpRequestParser.hpp"
 #include "../../include/utils/DebugLogger.hpp"
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <utility>
+
+static std::string toLowerCopy(const std::string& value)
+{
+    std::string lower = value;
+    for (std::size_t i = 0; i < lower.size(); ++i)
+        lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lower[i])));
+    return lower;
+}
+
+static bool isValidHeaderName(const std::string& name)
+{
+    if (name.empty())
+        return false;
+    for (std::size_t i = 0; i < name.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(name[i]);
+        if (!(std::isalnum(c) || c == '-'))
+            return false;
+    }
+    return true;
+}
 
 bool validStartLine(HttpRequest& request)
 {
@@ -36,13 +57,22 @@ bool pushHeader(const std::string& line, HttpRequest& request)
     if (posDot == std::string::npos)
         return false;
 
-    std::string key, value;
-    key = line.substr(0, posDot);
+    std::string key = line.substr(0, posDot);
+    if (!isValidHeaderName(key))
+        return false;
+
     std::size_t value_start = posDot + 1;
     if (value_start < line.size() && line[value_start] == ' ')
         ++value_start;
-    value = line.substr(value_start);
-    request.headers.insert(std::make_pair(key, value));
+    std::string value = line.substr(value_start);
+    if (!value.empty() && value[value.size() - 1] == '\r')
+        value.erase(value.size() - 1);
+
+    std::string normalized_key = toLowerCopy(key);
+    if (normalized_key == "content-length" && request.headers.find(normalized_key) != request.headers.end())
+        return false;
+
+    request.headers[normalized_key] = value;
     return true;
 }
 
@@ -77,7 +107,7 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
     std::size_t body_start = buffer.size();
     while (start <= buffer.size()) {
         std::size_t end = buffer.find('\n', start);
-        std::string header_line = buffer.substr(start, end - start);
+        std::string header_line = buffer.substr(start, end == std::string::npos ? std::string::npos : end - start);
         if (header_line == "" || header_line == "\r") {
             if (end == std::string::npos)
                 body_start = buffer.size();
@@ -85,7 +115,8 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
                 body_start = end + 1;
             break;
         }
-        pushHeader(header_line, request);
+        if (!pushHeader(header_line, request))
+            throw HttpRequestParser::FirstLineInvalidException();
         if (end == std::string::npos) {
             body_start = buffer.size();
             break;

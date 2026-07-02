@@ -8,6 +8,7 @@
 #include "handlers/StaticHandler.hpp"
 #include "http/HttpResponse.hpp"
 #include <cerrno>
+#include <cctype>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -16,6 +17,14 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <vector>
+
+static std::string toLowerCopy(const std::string& value)
+{
+    std::string lower = value;
+    for (std::size_t i = 0; i < lower.size(); ++i)
+        lower[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(lower[i])));
+    return lower;
+}
 
 static bool requestComplete(const std::string& buffer, size_t& body_start, size_t& content_length)
 {
@@ -34,21 +43,47 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
     body_start = header_end + sep_len;
     std::string headers = buffer.substr(0, header_end);
 
-    size_t pos = headers.find("Content-Length:");
-    if (pos == std::string::npos)
+    bool saw_content_length = false;
+    std::string content_length_header;
+    std::size_t start = 0;
+    while (start <= headers.size()) {
+        std::size_t end = headers.find('\n', start);
+        std::size_t line_len = (end == std::string::npos) ? headers.size() - start : end - start;
+        std::string line = headers.substr(start, line_len);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+
+        std::size_t colon = line.find(':');
+        if (colon != std::string::npos) {
+            std::string key = line.substr(0, colon);
+            if (toLowerCopy(key) == "content-length") {
+                std::size_t value_start = colon + 1;
+                if (value_start < line.size() && line[value_start] == ' ')
+                    ++value_start;
+                std::string current_value = line.substr(value_start);
+                if (saw_content_length)
+                    return buffer.size() >= body_start;
+                saw_content_length = true;
+                content_length_header = current_value;
+            }
+        }
+
+        if (end == std::string::npos)
+            break;
+        start = end + 1;
+    }
+
+    if (!saw_content_length)
         return buffer.size() >= body_start;
 
-    pos += std::strlen("Content-Length:");
-    while (pos < headers.size() && (headers[pos] == ' ' || headers[pos] == '\t'))
-        ++pos;
-
     std::string len_str;
-    while (pos < headers.size() && headers[pos] >= '0' && headers[pos] <= '9') {
-        len_str += headers[pos];
-        ++pos;
+    for (std::size_t i = 0; i < content_length_header.size(); ++i) {
+        if (content_length_header[i] < '0' || content_length_header[i] > '9')
+            return buffer.size() >= body_start;
+        len_str += content_length_header[i];
     }
     if (len_str.empty())
-        return false;
+        return buffer.size() >= body_start;
 
     std::istringstream iss(len_str);
     iss >> content_length;
@@ -166,7 +201,7 @@ void EventLoop::run()
                     bool keep_alive = false;
                     DEBUG_LOG << "ok = " << ok << std::endl;
                     if (ok) {
-                        std::map<std::string, std::string>::iterator hit = request.headers.find("Connection");
+                        std::map<std::string, std::string>::iterator hit = request.headers.find("connection");
                         if (hit != request.headers.end()) {
                             keep_alive = (hit->second == "keep-alive");
                         } else {
