@@ -65,11 +65,11 @@ Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
   - `Config(const std::string& filename)`
   - accesseurs quand necessaire.
 - [~] Centraliser les helpers communs:
-  - non-blocking fd
-  - close fd safe
-  - status reason phrases
-  - string trim/lowercase
-  - path utilities.
+  - [x] non-blocking fd
+  - [x] close fd safe
+  - [x] status reason phrases
+  - [x] string trim/lowercase
+  - [ ] path utilities
 - [x] Fermer proprement `epfd` et tous les sockets a l'arret.
 - [x] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
 
