@@ -110,7 +110,14 @@ bool Router::resolve(int listen_port, const HttpRequest& request, RequestContext
         context.autoindex = location->autoindex;
         context.allowed_methods = location->allowed_methods;
         context.cgi = location->cgi;
+        context.error_pages = server->error_pages;
+        for (std::map<int, std::string>::const_iterator it = location->error_pages.begin();
+             it != location->error_pages.end(); ++it) {
+            context.error_pages[it->first] = it->second;
+        }
         context.upload_dir = location->upload_dir;
+    } else {
+        context.error_pages = server->error_pages;
     }
     return true;
 }

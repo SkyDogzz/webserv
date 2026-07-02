@@ -60,30 +60,18 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
     response.status_code = 200;
 
     if (request.method != "GET" && request.method != "HEAD") {
-        response.status_code = 405;
-        response.body = httpReasonPhrase(response.status_code);
-        response.headers["Content-Length"] = "18";
-        response.headers["Content-Type"] = "text/plain";
-        return response;
+        return HttpResponse::makeError(405, false);
     }
 
     if (isPathTraversal(request.path)) {
-        response.status_code = 403;
-        response.body = httpReasonPhrase(response.status_code);
-        response.headers["Content-Length"] = "9";
-        response.headers["Content-Type"] = "text/plain";
-        return response;
+        return HttpResponse::makeError(403, false);
     }
 
     std::string file_path = buildPath(request.path);
     DEBUG_LOG << "try path: \"" << file_path << "\"" << std::endl;
     std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
-        response.status_code = 404;
-        response.body = httpReasonPhrase(response.status_code);
-        response.headers["Content-Length"] = "9";
-        response.headers["Content-Type"] = "text/plain";
-        return response;
+        return HttpResponse::makeError(404, false);
     }
 
     std::ostringstream buffer;

@@ -33,6 +33,7 @@ public:
 
     bool autoindex;
 
+    std::map<int, std::string> error_pages;
     std::map<std::string, std::string> cgi; // extension -> interpreter
     std::string upload_dir;
 };

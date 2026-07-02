@@ -261,13 +261,13 @@ Objectif: produire des reponses correctes, completes et coherentes.
   - 500 Internal Server Error
   - 501 Not Implemented
   - 504 Gateway Timeout si CGI timeout.
-- [ ] Ne pas encoder `Connection` via un faux header `keep-alive`.
+- [x] Ne pas encoder `Connection` via un faux header `keep-alive`.
 - [~] Respecter les headers fournis par les handlers.
 - [ ] Ajouter `Date` si souhaite, sinon garder minimal.
-- [ ] Ajouter `Allow` sur 405.
+- [x] Ajouter `Allow` sur 405.
 - [ ] Ajouter `Location` sur redirect.
-- [ ] Implementer default error pages HTML si aucune page configuree.
-- [ ] Servir les `error_page` configurees si disponibles.
+- [x] Implementer default error pages HTML si aucune page configuree.
+- [~] Servir les `error_page` configurees si disponibles.
 - [~] Eviter de recalculer un Content-Length faux:
   - body vide pour 204.
   - body absent pour HEAD si HEAD supporte.
