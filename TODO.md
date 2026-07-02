@@ -154,7 +154,7 @@ Objectif: respecter strictement le modele I/O du sujet.
 - [x] Gerer les lectures partielles:
   - accumuler dans `in_buffer`.
   - parser seulement quand la requete est complete.
-- [ ] Ajouter timeouts de connexion:
+- [x] Ajouter timeouts de connexion:
   - headers incomplets.
   - body incomplet.
   - idle keep-alive.
