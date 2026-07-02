@@ -25,6 +25,93 @@ static bool isValidHeaderName(const std::string& name)
     return true;
 }
 
+static bool parseChunkSizeLine(const std::string& line, std::size_t& chunk_size)
+{
+    std::size_t pos = 0;
+    chunk_size = 0;
+
+    while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t'))
+        ++pos;
+    if (pos == line.size())
+        return false;
+
+    for (; pos < line.size(); ++pos) {
+        char c = line[pos];
+        if (c == ';')
+            return true;
+        if (c >= '0' && c <= '9') {
+            chunk_size = chunk_size * 16 + static_cast<std::size_t>(c - '0');
+        } else if (c >= 'a' && c <= 'f') {
+            chunk_size = chunk_size * 16 + static_cast<std::size_t>(10 + c - 'a');
+        } else if (c >= 'A' && c <= 'F') {
+            chunk_size = chunk_size * 16 + static_cast<std::size_t>(10 + c - 'A');
+        } else if (c == ' ' || c == '\t') {
+            while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t'))
+                ++pos;
+            return pos == line.size() || line[pos] == ';';
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool consumeChunkedBody(const std::string& body, std::string* decoded_body)
+{
+    std::size_t pos = 0;
+
+    while (true) {
+        std::size_t line_end = body.find('\n', pos);
+        if (line_end == std::string::npos)
+            return false;
+
+        std::string size_line = body.substr(pos, line_end - pos);
+        if (!size_line.empty() && size_line[size_line.size() - 1] == '\r')
+            size_line.erase(size_line.size() - 1);
+
+        std::size_t chunk_size = 0;
+        if (!parseChunkSizeLine(size_line, chunk_size))
+            return false;
+
+        pos = line_end + 1;
+        if (body.size() < pos + chunk_size)
+            return false;
+
+        if (decoded_body != NULL && chunk_size > 0)
+            decoded_body->append(body, pos, chunk_size);
+
+        pos += chunk_size;
+        if (pos >= body.size())
+            return false;
+
+        if (body[pos] == '\r') {
+            if (pos + 1 >= body.size())
+                return false;
+            if (body[pos + 1] != '\n')
+                return false;
+            pos += 2;
+        } else if (body[pos] == '\n') {
+            ++pos;
+        } else {
+            return false;
+        }
+
+        if (chunk_size == 0) {
+            while (true) {
+                std::size_t trailer_end = body.find('\n', pos);
+                if (trailer_end == std::string::npos)
+                    return false;
+                std::string trailer_line = body.substr(pos, trailer_end - pos);
+                if (!trailer_line.empty() && trailer_line[trailer_line.size() - 1] == '\r')
+                    trailer_line.erase(trailer_line.size() - 1);
+                pos = trailer_end + 1;
+                if (trailer_line.empty())
+                    return pos == body.size();
+            }
+        }
+    }
+}
+
 bool validStartLine(HttpRequest& request)
 {
     if (request.method != "GET" && request.method != "POST" && request.method != "DELETE")
@@ -70,6 +157,8 @@ bool pushHeader(const std::string& line, HttpRequest& request)
 
     std::string normalized_key = toLowerCopy(key);
     if (normalized_key == "content-length" && request.headers.find(normalized_key) != request.headers.end())
+        return false;
+    if (normalized_key == "transfer-encoding" && request.headers.find(normalized_key) != request.headers.end())
         return false;
 
     request.headers[normalized_key] = value;
@@ -127,6 +216,17 @@ bool HttpRequestParser::parse(const std::string& buffer, HttpRequest& request)
         request.body = buffer.substr(body_start);
         if (!request.body.empty() && request.body[0] == '\r')
             request.body.erase(0, 1);
+    }
+    std::map<std::string, std::string>::const_iterator te = request.headers.find("transfer-encoding");
+    if (te != request.headers.end()) {
+        if (toLowerCopy(te->second) != "chunked")
+            throw HttpRequestParser::FirstLineInvalidException();
+        if (request.headers.find("content-length") != request.headers.end())
+            throw HttpRequestParser::FirstLineInvalidException();
+        std::string decoded_body;
+        if (!consumeChunkedBody(request.body, &decoded_body))
+            throw HttpRequestParser::FirstLineInvalidException();
+        request.body = decoded_body;
     }
     printRequest(request);
     return true;

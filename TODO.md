@@ -10,7 +10,7 @@ Le depot contient une base minimale de serveur HTTP:
 - `EventLoop` utilise `epoll` et cree deux ports en dur: `8080` et `8081`.
 - `ListeningSocket` ouvre des sockets TCP, bind/listen, et les passe en non-bloquant.
 - `Connection` gere un fd client avec buffers `in_buffer` et `out_buffer`.
-- `HttpRequestParser` parse une requete HTTP tres simple.
+- `HttpRequestParser` parse une requete HTTP tres simple, avec headers normalises en minuscules, rejet des `Content-Length` dupliques, et support du `Transfer-Encoding: chunked`.
 - `HttpResponse` serialise une reponse basique.
 - `StaticHandler` sert des fichiers statiques depuis `./`.
 - `Router` est declare mais non implemente/utilise.
@@ -182,14 +182,14 @@ Objectif: transformer un flux TCP en requetes HTTP valides et exploitables.
   - reconnues: GET, POST, DELETE.
   - non autorisees par location: 405.
   - inconnues: 400 ou 501 selon strategie.
-- [ ] Parser headers de facon case-insensitive.
+- [x] Parser headers de facon case-insensitive.
 - [~] Nettoyer correctement `\r\n`.
 - [~] Gerer `Content-Length`:
   - absent.
   - invalide.
   - negatif/impossible.
-  - multiple.
-- [ ] Gerer `Transfer-Encoding: chunked`:
+  - multiple: rejetes.
+- [x] Gerer `Transfer-Encoding: chunked`:
   - unchunk avant handlers/CGI.
   - detecter chunk invalide.
 - [~] Extraire URI:
