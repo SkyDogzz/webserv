@@ -21,9 +21,9 @@ Compilation: `make re` passe hors sandbox avec `-Wall -Wextra -Werror -std=c++98
 
 Legende:
 
-- `[x]` fait.
-- `[~]` partiel: une base existe dans le code, mais le libelle complet n'est pas encore respecte.
-- `[ ]` non fait ou non prouve.
+- `[x]` termine.
+- `[~]` partiel.
+- `[ ]` a faire ou non prouve.
 
 ## Ecarts majeurs avec le sujet
 
