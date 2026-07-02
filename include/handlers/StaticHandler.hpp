@@ -14,10 +14,15 @@ public:
 private:
     RequestContext context_;
 
-    std::string buildPath(const std::string& uri, const std::string& index) const;
+    std::string buildGetPath(const std::string& uri, const std::string& index) const;
+    std::string buildFilesystemPath(const std::string& uri) const;
     std::string guessMimeType(const std::string& path) const;
     std::string buildRedirectLocation(const std::string& target) const;
     HttpResponse makeErrorResponse(int status_code) const;
+    HttpResponse handleGetOrHead(const HttpRequest& request) const;
+    HttpResponse handlePost(const HttpRequest& request) const;
+    HttpResponse handleDelete(const HttpRequest& request) const;
+    std::string makeUploadFilename(const std::string& hint) const;
 };
 
 #endif

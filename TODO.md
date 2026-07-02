@@ -312,14 +312,14 @@ Validation:
 
 Objectif: couvrir les methodes obligatoires du sujet.
 
-- [ ] POST:
+- [x] POST:
   - si location upload active, ecrire le body dans `upload_dir`.
   - choisir une strategie de nommage de fichier.
   - retourner 201 Created ou status coherent.
   - verifier permissions et existence du dossier.
-- [ ] POST sans upload ni CGI:
+- [x] POST sans upload ni CGI:
   - retourner 405/404/501 selon configuration retenue.
-- [ ] DELETE:
+- [x] DELETE:
   - mapper URI vers fichier sous root.
   - refuser dossiers sauf choix explicite.
   - supprimer via fonction autorisee si disponible dans sujet; verifier si `unlink` est autorise avant usage.
