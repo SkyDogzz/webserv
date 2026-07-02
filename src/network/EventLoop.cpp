@@ -118,8 +118,34 @@ static bool consumeChunkedBody(const std::string& body, std::size_t& raw_body_le
     }
 }
 
-static bool requestComplete(const std::string& buffer, size_t& body_start, size_t& content_length)
+enum RequestFrameStatus {
+    FRAME_INCOMPLETE,
+    FRAME_COMPLETE,
+    FRAME_INVALID
+};
+
+static bool parseStrictSize(const std::string& value, std::size_t& out)
 {
+    std::string trimmed = Utils::trimCopy(value);
+    if (trimmed.empty())
+        return false;
+
+    out = 0;
+    for (std::size_t i = 0; i < trimmed.size(); ++i) {
+        char c = trimmed[i];
+        if (c < '0' || c > '9')
+            return false;
+        std::size_t digit = static_cast<std::size_t>(c - '0');
+        if (out > (static_cast<std::size_t>(-1) - digit) / 10)
+            return false;
+        out = out * 10 + digit;
+    }
+    return true;
+}
+
+static RequestFrameStatus requestComplete(const std::string& buffer, size_t& body_start, size_t& content_length)
+{
+    const std::size_t max_header_size = 16384;
     body_start = std::string::npos;
     content_length = 0;
 
@@ -129,11 +155,19 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
         header_end = buffer.find("\n\n");
         sep_len = 2;
     }
-    if (header_end == std::string::npos)
-        return false;
+    if (header_end == std::string::npos) {
+        if (buffer.size() > max_header_size)
+            return FRAME_INVALID;
+        return FRAME_INCOMPLETE;
+    }
+
+    if (header_end > max_header_size)
+        return FRAME_INVALID;
 
     body_start = header_end + sep_len;
     std::string headers = buffer.substr(0, header_end);
+    if (headers.size() > max_header_size)
+        return FRAME_INVALID;
 
     bool saw_transfer_encoding = false;
     bool saw_content_length = false;
@@ -163,10 +197,7 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
                     ++value_start;
                 std::string current_value = line.substr(value_start);
                 if (saw_content_length)
-                {
-                    content_length = buffer.size() - body_start;
-                    return true;
-                }
+                    return FRAME_INVALID;
                 saw_content_length = true;
                 content_length_header = current_value;
             }
@@ -181,33 +212,21 @@ static bool requestComplete(const std::string& buffer, size_t& body_start, size_
         std::string body = buffer.substr(body_start);
         bool invalid = false;
         if (!consumeChunkedBody(body, content_length, invalid))
-            return false;
+            return FRAME_INCOMPLETE;
         if (invalid)
-            return true;
-        return true;
+            return FRAME_INVALID;
+        return FRAME_COMPLETE;
     }
 
     if (!saw_content_length)
-        return buffer.size() >= body_start;
+        return FRAME_COMPLETE;
 
-    std::string len_str;
-    for (std::size_t i = 0; i < content_length_header.size(); ++i) {
-        if (content_length_header[i] < '0' || content_length_header[i] > '9')
-        {
-            content_length = buffer.size() - body_start;
-            return true;
-        }
-        len_str += content_length_header[i];
-    }
-    if (len_str.empty())
-    {
-        content_length = buffer.size() - body_start;
-        return true;
-    }
+    if (!parseStrictSize(content_length_header, content_length))
+        return FRAME_INVALID;
 
-    std::istringstream iss(len_str);
-    iss >> content_length;
-    return buffer.size() >= body_start + content_length;
+    if (buffer.size() < body_start + content_length)
+        return FRAME_INCOMPLETE;
+    return FRAME_COMPLETE;
 }
 
 static std::string joinAllowHeader(const RequestContext& context)
@@ -398,15 +417,34 @@ void EventLoop::run()
             }
 
             if (events[i].events & EPOLLIN) {
-                if (!conn.readFromSocket()) {
+                bool was_empty = conn.in_buffer.empty();
+                bool peer_closed = false;
+                if (!conn.readFromSocket())
+                    peer_closed = true;
+                if (peer_closed && conn.in_buffer.empty()) {
                     closeConnection(epfd, conns, fd);
                     continue;
                 }
+                if (was_empty)
+                    conn.markRequestStart();
                 conn.markActivity();
+                if (peer_closed)
+                    conn.markCloseAfterWrite();
+                while (true) {
+                    size_t body_start = 0;
+                    size_t content_length = 0;
+                    RequestFrameStatus frame = requestComplete(conn.in_buffer, body_start, content_length);
+                    if (frame == FRAME_INCOMPLETE)
+                        break;
 
-                size_t body_start = 0;
-                size_t content_length = 0;
-                if (requestComplete(conn.in_buffer, body_start, content_length)) {
+                    if (frame == FRAME_INVALID) {
+                        HttpResponse response = buildErrorResponse(400, false, NULL);
+                        conn.out_buffer += response.toString();
+                        conn.in_buffer.clear();
+                        conn.markCloseAfterWrite();
+                        break;
+                    }
+
                     std::string request_raw = conn.in_buffer.substr(0, body_start + content_length);
                     conn.in_buffer.erase(0, body_start + content_length);
 
@@ -418,51 +456,39 @@ void EventLoop::run()
                         std::cerr << "Parse error: " << e.what() << std::endl;
                     }
 
-                    bool keep_alive = false;
                     DEBUG_LOG << "ok = " << ok << std::endl;
-                    if (ok) {
-                        std::map<std::string, std::string>::iterator hit = request.headers.find("connection");
-                        if (hit != request.headers.end()) {
-                            keep_alive = (hit->second == "keep-alive");
-                        } else {
-                            keep_alive = (request.version == "HTTP/1.1");
-                        }
+                    if (!ok) {
+                        HttpResponse response = buildErrorResponse(400, false, NULL);
+                        conn.out_buffer += response.toString();
+                        conn.markCloseAfterWrite();
+                        conn.in_buffer.clear();
+                        break;
                     }
+
+                    bool keep_alive = request.keep_alive;
                     conn.setKeepAlive(keep_alive);
                     if (!keep_alive)
                         conn.markCloseAfterWrite();
-                    else
-                        conn.markRequestStart();
 
-                    if (!ok) {
-                        HttpResponse response = buildErrorResponse(400, keep_alive, NULL);
-                        conn.out_buffer = response.toString();
-                    } else {
-                        HttpResponse response;
-                        response.status_code = 500;
+                    HttpResponse response;
+                    response.status_code = 500;
 
-                        if (config != NULL && !config->servers.empty()) {
-                            std::map<int, size_t>::const_iterator listen_it = listen_map.find(conn.getListenFd());
-                            int listen_port = 0;
-                            if (listen_it != listen_map.end())
-                                listen_port = std::atoi(listens[listen_it->second].getPort().c_str());
+                    if (config != NULL && !config->servers.empty()) {
+                        std::map<int, size_t>::const_iterator listen_it = listen_map.find(conn.getListenFd());
+                        int listen_port = 0;
+                        if (listen_it != listen_map.end())
+                            listen_port = std::atoi(listens[listen_it->second].getPort().c_str());
 
-                            Router router(*config);
-                            RequestContext context;
-                            if (router.resolve(listen_port, request, context)) {
-                                size_t max_body = context.server != NULL ? context.server->client_max_body_size : 0;
-                                if (max_body > 0 && request.body.size() > max_body) {
-                                    response = buildErrorResponse(413, keep_alive, &context);
-                                } else if (!isMethodAllowed(context, request.method)) {
-                                    response = buildErrorResponse(405, keep_alive, &context);
-                                } else {
-                                    StaticHandler staticHandler(context);
-                                    response = staticHandler.handle(request);
-                                    response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
-                                }
+                        Router router(*config);
+                        RequestContext context;
+                        if (router.resolve(listen_port, request, context)) {
+                            size_t max_body = context.server != NULL ? context.server->client_max_body_size : 0;
+                            if (max_body > 0 && request.body.size() > max_body) {
+                                response = buildErrorResponse(413, keep_alive, &context);
+                            } else if (!isMethodAllowed(context, request.method)) {
+                                response = buildErrorResponse(405, keep_alive, &context);
                             } else {
-                                RequestContext fallback;
-                                StaticHandler staticHandler(fallback);
+                                StaticHandler staticHandler(context);
                                 response = staticHandler.handle(request);
                                 response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                             }
@@ -472,11 +498,26 @@ void EventLoop::run()
                             response = staticHandler.handle(request);
                             response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                         }
-
-                        conn.out_buffer = response.toString();
+                    } else {
+                        RequestContext fallback;
+                        StaticHandler staticHandler(fallback);
+                        response = staticHandler.handle(request);
+                        response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                     }
-                    conn.modEpoll(epfd, true);
+
+                    conn.out_buffer += response.toString();
+                    if (!keep_alive)
+                        break;
+                    if (conn.in_buffer.empty())
+                        break;
+                    conn.markRequestStart();
                 }
+
+                if (peer_closed && !conn.wantsWrite()) {
+                    closeConnection(epfd, conns, fd);
+                    continue;
+                }
+                conn.modEpoll(epfd, conn.wantsWrite());
             }
 
             if (events[i].events & EPOLLOUT) {

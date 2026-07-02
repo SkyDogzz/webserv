@@ -10,7 +10,7 @@ Le depot contient une base minimale de serveur HTTP:
 - `EventLoop` utilise `epoll` et cree encore deux ports en dur: `8080` et `8081`.
 - `ListeningSocket` ouvre des sockets TCP, bind/listen, et les passe en non-bloquant.
 - `Connection` gere un fd client avec buffers `in_buffer` et `out_buffer`.
-- `HttpRequestParser` parse une requete HTTP tres simple, avec headers normalises en minuscules, rejet des `Content-Length` dupliques, et support du `Transfer-Encoding: chunked`.
+- `HttpRequestParser` parse une requete HTTP robuste, avec headers normalises en minuscules, support de `HTTP/1.0`/`HTTP/1.1`, `Content-Length`, `Transfer-Encoding: chunked`, keep-alive et requetes consecutives.
 - `HttpResponse` serialise une reponse basique.
 - `StaticHandler` sert des fichiers statiques via le `RequestContext`.
 - `Router` est commence et branche de facon minimale pour la selection server/location.
@@ -173,19 +173,19 @@ Validation:
 
 Objectif: transformer un flux TCP en requetes HTTP valides et exploitables.
 
-- [~] Separer clairement:
+- [x] Separer clairement:
   - detection de requete complete.
   - parsing de start-line.
   - parsing headers.
   - parsing body.
-- [~] Accepter au minimum `HTTP/1.0` et `HTTP/1.1` si choisi, ou documenter strictement le choix.
-- [~] Valider methodes:
+- [x] Accepter au minimum `HTTP/1.0` et `HTTP/1.1` si choisi, ou documenter strictement le choix.
+- [x] Valider methodes:
   - reconnues: GET, POST, DELETE.
   - non autorisees par location: 405.
   - inconnues: 400 ou 501 selon strategie.
 - [x] Parser headers de facon case-insensitive.
-- [~] Nettoyer correctement `\r\n`.
-- [~] Gerer `Content-Length`:
+- [x] Nettoyer correctement `\r\n`.
+- [x] Gerer `Content-Length`:
   - absent.
   - invalide.
   - negatif/impossible.
@@ -193,18 +193,18 @@ Objectif: transformer un flux TCP en requetes HTTP valides et exploitables.
 - [x] Gerer `Transfer-Encoding: chunked`:
   - unchunk avant handlers/CGI.
   - detecter chunk invalide.
-- [~] Extraire URI:
+- [x] Extraire URI:
   - path.
   - query string.
   - percent-decoding si necessaire pour fichiers.
-- [~] Gerer Host pour HTTP/1.1:
+- [x] Gerer Host pour HTTP/1.1:
   - obligatoire.
   - utile pour virtual hosts si implemente.
-- [~] Gerer keep-alive:
+- [x] Gerer keep-alive:
   - HTTP/1.1 keep-alive par defaut sauf `Connection: close`.
   - HTTP/1.0 close par defaut sauf `Connection: keep-alive`.
-- [~] Supporter plusieurs requetes dans `in_buffer` apres une lecture, ou decider de fermer apres une reponse.
-- [ ] Appliquer limites:
+- [x] Supporter plusieurs requetes dans `in_buffer` apres une lecture, ou decider de fermer apres une reponse.
+- [x] Appliquer limites:
   - taille headers max.
   - taille body selon config.
 
