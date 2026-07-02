@@ -284,6 +284,28 @@ static HttpResponse buildErrorResponse(int status_code, bool keep_alive, const R
     return response;
 }
 
+static void finalizeResponse(HttpResponse& response, const HttpRequest& request, bool keep_alive)
+{
+    if (response.headers.find("Connection") == response.headers.end())
+        response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
+
+    if (response.status_code == 204) {
+        response.body.clear();
+        response.headers.erase("Content-Type");
+        if (response.headers.find("Content-Length") == response.headers.end())
+            response.headers["Content-Length"] = "0";
+    }
+
+    if (request.method == "HEAD") {
+        if (response.headers.find("Content-Length") == response.headers.end()) {
+            std::ostringstream len;
+            len << response.body.size();
+            response.headers["Content-Length"] = len.str();
+        }
+        response.body.clear();
+    }
+}
+
 static bool isMethodAllowed(const RequestContext& context, const std::string& method)
 {
     if (context.allowed_methods.empty())
@@ -482,29 +504,32 @@ void EventLoop::run()
                         Router router(*config);
                         RequestContext context;
                         if (router.resolve(listen_port, request, context)) {
-                            size_t max_body = context.server != NULL ? context.server->client_max_body_size : 0;
-                            if (max_body > 0 && request.body.size() > max_body) {
-                                response = buildErrorResponse(413, keep_alive, &context);
-                            } else if (!isMethodAllowed(context, request.method)) {
-                                response = buildErrorResponse(405, keep_alive, &context);
+                            if (!context.redirect_url.empty()) {
+                                int redirect_code = context.redirect_code != 0 ? context.redirect_code : 301;
+                                response = HttpResponse::makeRedirect(redirect_code, context.redirect_url, keep_alive);
                             } else {
-                                StaticHandler staticHandler(context);
-                                response = staticHandler.handle(request);
-                                response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
+                                size_t max_body = context.server != NULL ? context.server->client_max_body_size : 0;
+                                if (max_body > 0 && request.body.size() > max_body) {
+                                    response = buildErrorResponse(413, keep_alive, &context);
+                                } else if (!isMethodAllowed(context, request.method)) {
+                                    response = buildErrorResponse(405, keep_alive, &context);
+                                } else {
+                                    StaticHandler staticHandler(context);
+                                    response = staticHandler.handle(request);
+                                }
                             }
                         } else {
                             RequestContext fallback;
                             StaticHandler staticHandler(fallback);
                             response = staticHandler.handle(request);
-                            response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                         }
                     } else {
                         RequestContext fallback;
                         StaticHandler staticHandler(fallback);
                         response = staticHandler.handle(request);
-                        response.headers["Connection"] = keep_alive ? "keep-alive" : "close";
                     }
 
+                    finalizeResponse(response, request, keep_alive);
                     conn.out_buffer += response.toString();
                     if (!keep_alive)
                         break;

@@ -5,6 +5,8 @@ LocationConfig::LocationConfig()
     , root("")
     , index("")
     , autoindex(false)
+    , redirect_code(0)
+    , redirect_url("")
     , upload_dir("")
 {
 }

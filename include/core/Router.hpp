@@ -26,6 +26,8 @@ struct RequestContext {
     std::string root;
     std::string index;
     bool autoindex;
+    int redirect_code;
+    std::string redirect_url;
     std::set<std::string> allowed_methods;
     std::map<std::string, std::string> cgi;
     std::map<int, std::string> error_pages;
