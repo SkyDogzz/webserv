@@ -24,7 +24,11 @@ WebServer& WebServer::getInstance()
     return _instance;
 }
 
-void WebServer::appliConfig(Config& config) { _config = &config; }
+void WebServer::appliConfig(Config& config)
+{
+    config.validate();
+    _config = &config;
+}
 
 const Config* WebServer::getConfig() const { return _config; }
 
