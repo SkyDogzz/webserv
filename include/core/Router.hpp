@@ -45,7 +45,6 @@ private:
 
     const ServerConfig* selectServer(int listen_port, const HttpRequest& request) const;
     const LocationConfig* selectLocation(const ServerConfig& server, const std::string& path) const;
-    static std::string normalizePath(const std::string& path);
     static std::string hostWithoutPort(const std::string& host);
 };
 

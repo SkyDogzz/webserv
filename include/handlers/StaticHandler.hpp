@@ -16,7 +16,6 @@ private:
 
     std::string buildPath(const std::string& uri, const std::string& index) const;
     std::string guessMimeType(const std::string& path) const;
-    bool isPathTraversal(const std::string& uri) const;
 };
 
 #endif
