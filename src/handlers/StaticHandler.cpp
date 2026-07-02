@@ -1,6 +1,7 @@
 #include "../../include/handlers/StaticHandler.hpp"
 #include "../../include/http/HttpStatus.hpp"
 #include "../../include/utils/DebugLogger.hpp"
+#include "../../include/utils/Utils.hpp"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -10,22 +11,15 @@ StaticHandler::StaticHandler(const RequestContext& context)
 {
 }
 
-bool StaticHandler::isPathTraversal(const std::string& uri) const { return uri.find("..") != std::string::npos; }
-
 std::string StaticHandler::buildPath(const std::string& uri, const std::string& index) const
 {
-    std::string path = uri;
-    std::size_t query_pos = path.find('?');
-    if (query_pos != std::string::npos)
-        path = path.substr(0, query_pos);
-    if (!path.empty() && path[0] == '/')
-        path.erase(0, 1);
-    if (path.empty() || path[path.size() - 1] == '/')
-        path += index.empty() ? "index.html" : index;
+    std::string path = Utils::stripQueryCopy(uri);
+    if (path.empty())
+        path = "/";
+    if (path[path.size() - 1] == '/')
+        path = Utils::joinPathCopy(path, index.empty() ? "index.html" : index);
 
-    if (!context_.root.empty() && context_.root[context_.root.size() - 1] == '/')
-        return context_.root + path;
-    return context_.root + "/" + path;
+    return Utils::joinPathCopy(context_.root, path);
 }
 
 std::string StaticHandler::guessMimeType(const std::string& path) const
@@ -63,7 +57,7 @@ HttpResponse StaticHandler::handle(const HttpRequest& request)
         return HttpResponse::makeError(405, false);
     }
 
-    if (isPathTraversal(request.path)) {
+    if (Utils::hasPathTraversal(request.path)) {
         return HttpResponse::makeError(403, false);
     }
 
