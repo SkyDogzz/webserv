@@ -12,7 +12,7 @@ Le depot contient une base minimale de serveur HTTP:
 - `Connection` gere un fd client avec buffers `in_buffer` et `out_buffer`.
 - `HttpRequestParser` parse une requete HTTP tres simple, avec headers normalises en minuscules, rejet des `Content-Length` dupliques, et support du `Transfer-Encoding: chunked`.
 - `HttpResponse` serialise une reponse basique.
-- `StaticHandler` sert des fichiers statiques depuis `./`.
+- `StaticHandler` sert des fichiers statiques via le `RequestContext`.
 - `Router` est commence et branche de facon minimale pour la selection server/location.
 - `server.cpp` et `client.cpp` sont des essais UDP hors build.
 - `README.md`, fichiers de config de demo, error pages, tests et CGI sont absents.
@@ -64,7 +64,7 @@ Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
 - [x] Rendre les signatures const-correct:
   - `Config(const std::string& filename)`
   - accesseurs quand necessaire.
-- [~] Centraliser les helpers communs:
+- [x] Centraliser les helpers communs:
   - [x] non-blocking fd
   - [x] close fd safe
   - [x] status reason phrases
