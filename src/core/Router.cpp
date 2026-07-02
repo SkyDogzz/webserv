@@ -24,19 +24,6 @@ std::string Router::hostWithoutPort(const std::string& host)
     return Utils::toLowerCopy(value);
 }
 
-std::string Router::normalizePath(const std::string& path)
-{
-    std::string normalized = path;
-    std::string::size_type query = normalized.find('?');
-    if (query != std::string::npos)
-        normalized.erase(query);
-    if (normalized.empty() || normalized[0] != '/')
-        normalized.insert(normalized.begin(), '/');
-    while (normalized.size() > 1 && normalized[normalized.size() - 1] == '/')
-        normalized.erase(normalized.size() - 1);
-    return normalized;
-}
-
 const ServerConfig* Router::selectServer(int listen_port, const HttpRequest& request) const
 {
     if (config_.servers.empty())
@@ -90,7 +77,7 @@ bool Router::resolve(int listen_port, const HttpRequest& request, RequestContext
     context.root = server->root;
     context.index = server->index;
 
-    const LocationConfig* location = selectLocation(*server, normalizePath(request.path));
+    const LocationConfig* location = selectLocation(*server, Utils::normalizePathCopy(request.path));
     if (location != NULL) {
         context.location = location;
         if (!location->root.empty())

@@ -69,7 +69,7 @@ Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
   - [x] close fd safe
   - [x] status reason phrases
   - [x] string trim/lowercase
-  - [ ] path utilities
+  - [x] path utilities
 - [x] Fermer proprement `epfd` et tous les sockets a l'arret.
 - [x] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
 
