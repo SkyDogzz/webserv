@@ -284,12 +284,12 @@ Validation:
 Objectif: servir un site statique complet.
 
 - [x] Remplacer root hardcode `./` par root effectif du routing.
-- [~] Utiliser `stat` pour distinguer:
+- [x] Utiliser `stat` pour distinguer:
   - fichier.
   - dossier.
   - absent.
   - permissions insuffisantes.
-- [~] Si ressource dossier:
+- [x] Si ressource dossier:
   - si path sans `/`, optionnellement redirect vers `/`.
   - chercher index configure.
   - si pas d'index et autoindex on, generer listing.

@@ -5,6 +5,10 @@
 #include <cerrno>
 #include <cstdio>
 #include <ctime>
+#include <algorithm>
+#include <cstring>
+#include <dirent.h>
+#include <vector>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -49,6 +53,65 @@ std::string StaticHandler::buildRedirectLocation(const std::string& target) cons
     if (location[location.size() - 1] != '/')
         location += '/';
     return location + query;
+}
+
+std::string StaticHandler::htmlEscapeCopy(const std::string& value) const
+{
+    std::string escaped;
+    escaped.reserve(value.size());
+    for (std::string::size_type i = 0; i < value.size(); ++i) {
+        char c = value[i];
+        if (c == '&')
+            escaped += "&amp;";
+        else if (c == '<')
+            escaped += "&lt;";
+        else if (c == '>')
+            escaped += "&gt;";
+        else if (c == '\"')
+            escaped += "&quot;";
+        else
+            escaped.push_back(c);
+    }
+    return escaped;
+}
+
+std::string StaticHandler::buildAutoindexBody(const std::string& dir_path, const std::string& uri) const
+{
+    DIR* dir = opendir(dir_path.c_str());
+    if (dir == NULL)
+        return "";
+
+    std::vector<std::string> entries;
+    for (;;) {
+        errno = 0;
+        struct dirent* ent = readdir(dir);
+        if (ent == NULL)
+            break;
+        if (std::strcmp(ent->d_name, ".") == 0 || std::strcmp(ent->d_name, "..") == 0)
+            continue;
+        entries.push_back(ent->d_name);
+    }
+    closedir(dir);
+
+    std::sort(entries.begin(), entries.end());
+
+    std::ostringstream out;
+    out << "<html><head><title>Index of " << htmlEscapeCopy(uri) << "</title></head><body>";
+    out << "<h1>Index of " << htmlEscapeCopy(uri) << "</h1><ul>";
+    for (std::vector<std::string>::const_iterator it = entries.begin(); it != entries.end(); ++it) {
+        std::string entry_path = Utils::joinPathCopy(dir_path, *it);
+        std::string href = Utils::joinPathCopy(uri, *it);
+        struct stat st;
+        bool is_dir = (stat(entry_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode));
+        if (is_dir && href[href.size() - 1] != '/')
+            href += "/";
+        out << "<li><a href=\"" << htmlEscapeCopy(href) << "\">" << htmlEscapeCopy(*it);
+        if (is_dir)
+            out << "/";
+        out << "</a></li>";
+    }
+    out << "</ul></body></html>";
+    return out.str();
 }
 
 HttpResponse StaticHandler::makeErrorResponse(int status_code) const
@@ -168,22 +231,59 @@ HttpResponse StaticHandler::handleGetOrHead(const HttpRequest& request) const
 
     std::string base_path = buildFilesystemPath(request.path);
     struct stat st;
-    if (stat(base_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode) && !request.path.empty()
-        && request.path[request.path.size() - 1] != '/') {
-        return HttpResponse::makeRedirect(301, buildRedirectLocation(request.target), false);
-    }
-
-    std::string file_path = buildGetPath(request.path, context_.index);
-    DEBUG_LOG << "try path: \"" << file_path << "\"" << std::endl;
-    if (stat(file_path.c_str(), &st) != 0) {
+    if (stat(base_path.c_str(), &st) != 0) {
         if (errno == EACCES || errno == EPERM)
             return makeErrorResponse(403);
         return makeErrorResponse(404);
     }
+
+    if (S_ISDIR(st.st_mode)) {
+        if (!request.path.empty() && request.path[request.path.size() - 1] != '/')
+            return HttpResponse::makeRedirect(301, buildRedirectLocation(request.target), false);
+
+        std::string index_path = Utils::joinPathCopy(base_path, context_.index.empty() ? "index.html" : context_.index);
+        DEBUG_LOG << "try index path: \"" << index_path << "\"" << std::endl;
+        if (stat(index_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            std::ifstream file(index_path.c_str(), std::ios::in | std::ios::binary);
+            if (!file) {
+                if (errno == EACCES || errno == EPERM)
+                    return makeErrorResponse(403);
+                return makeErrorResponse(404);
+            }
+
+            std::ostringstream buffer;
+            buffer << file.rdbuf();
+            std::string body = buffer.str();
+            response.headers["Content-Type"] = guessMimeType(index_path);
+
+            std::ostringstream len;
+            len << body.size();
+            response.headers["Content-Length"] = len.str();
+
+            if (request.method != "HEAD")
+                response.body = body;
+            return response;
+        }
+
+        if (!context_.autoindex)
+            return makeErrorResponse(403);
+
+        std::string body = buildAutoindexBody(base_path, request.path);
+        if (body.empty())
+            return makeErrorResponse(403);
+        response.headers["Content-Type"] = "text/html";
+        std::ostringstream len;
+        len << body.size();
+        response.headers["Content-Length"] = len.str();
+        if (request.method != "HEAD")
+            response.body = body;
+        return response;
+    }
+
     if (!S_ISREG(st.st_mode))
         return makeErrorResponse(403);
 
-    std::ifstream file(file_path.c_str(), std::ios::in | std::ios::binary);
+    std::ifstream file(base_path.c_str(), std::ios::in | std::ios::binary);
     if (!file) {
         if (errno == EACCES || errno == EPERM)
             return makeErrorResponse(403);
@@ -193,7 +293,7 @@ HttpResponse StaticHandler::handleGetOrHead(const HttpRequest& request) const
     std::ostringstream buffer;
     buffer << file.rdbuf();
     std::string body = buffer.str();
-    response.headers["Content-Type"] = guessMimeType(file_path);
+    response.headers["Content-Type"] = guessMimeType(base_path);
 
     std::ostringstream len;
     len << body.size();

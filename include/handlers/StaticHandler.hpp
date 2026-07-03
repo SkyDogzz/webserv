@@ -18,6 +18,8 @@ private:
     std::string buildFilesystemPath(const std::string& uri) const;
     std::string guessMimeType(const std::string& path) const;
     std::string buildRedirectLocation(const std::string& target) const;
+    std::string buildAutoindexBody(const std::string& dir_path, const std::string& uri) const;
+    std::string htmlEscapeCopy(const std::string& value) const;
     HttpResponse makeErrorResponse(int status_code) const;
     HttpResponse handleGetOrHead(const HttpRequest& request) const;
     HttpResponse handlePost(const HttpRequest& request) const;
