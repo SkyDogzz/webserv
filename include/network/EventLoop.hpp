@@ -1,6 +1,8 @@
 #ifndef EVENTLOOP_HPP
 #define EVENTLOOP_HPP
 
+#include "../config/Config.hpp"
+
 /*
     EventLoop
     ---------
@@ -17,7 +19,7 @@
 
 class EventLoop {
 public:
-    void run();
+    void run(const Config& config);
 };
 
 #endif

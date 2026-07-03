@@ -7,7 +7,7 @@ Le depot contient une base minimale de serveur HTTP:
 - Makefile qui compile `src/**/*.cpp` en `webserv` avec `-Wall -Wextra -Werror -std=c++98`.
 - `main.cpp` impose un argument de configuration, mais la configuration est ignoree.
 - `Config`, `ServerConfig`, `LocationConfig` existent surtout comme structures de donnees, sans parsing.
-- `EventLoop` utilise `epoll` et cree encore deux ports en dur: `8080` et `8081`.
+- `EventLoop` utilise `epoll` et ouvre ses listeners a partir de la config.
 - `ListeningSocket` ouvre des sockets TCP, bind/listen, et les passe en non-bloquant.
 - `Connection` gere un fd client avec buffers `in_buffer` et `out_buffer`.
 - `HttpRequestParser` parse une requete HTTP robuste, avec headers normalises en minuscules, support de `HTTP/1.0`/`HTTP/1.1`, `Content-Length`, `Transfer-Encoding: chunked`, keep-alive et requetes consecutives.
@@ -28,7 +28,7 @@ Legende:
 ## Ecarts majeurs avec le sujet
 
 - La configuration n'est pas parse et n'influence pas le runtime.
-- Les ports, hosts et roots sont hardcodes.
+- Le runtime lit deja les listeners depuis `Config`, mais la configuration n'est pas encore parsee.
 - Le serveur ne respecte pas encore toutes les contraintes I/O du sujet:
   - `epoll_create1` est utilise alors que le sujet liste `epoll_create`.
   - `recv`/`send` consultent `errno` apres l'appel pour gerer `EAGAIN`/`EWOULDBLOCK`, ce que le sujet interdit pour read/write.
@@ -139,9 +139,9 @@ Validation:
 
 Objectif: respecter strictement le modele I/O du sujet.
 
-- [ ] Remplacer les listeners hardcodes de `EventLoop` par les `listen` issus de `Config`.
+- [x] Remplacer les listeners hardcodes de `EventLoop` par les `listen` issus de `Config`.
 - [x] Refuser plusieurs `server` sur un meme port au chargement de config.
-- [ ] Associer chaque fd listener a sa config server ou a un groupe de servers.
+- [x] Associer chaque fd listener a sa config server ou a un groupe de servers.
 - [x] Remplacer `epoll_create1(0)` par `epoll_create(size)` pour rester dans les fonctions autorisees.
 - [x] Garder un seul appel `epoll_wait` central pour toutes les I/O sockets.
 - [x] Sur sockets clients, ne faire `recv` que quand `EPOLLIN` est signale.
@@ -164,9 +164,9 @@ Objectif: respecter strictement le modele I/O du sujet.
 
 Validation:
 
-- [ ] Plusieurs clients simultanes peuvent charger des pages.
-- [ ] Un client lent ne bloque pas les autres.
-- [ ] Un client qui deconnecte pendant upload/download ne crash pas.
+- [~] Plusieurs clients simultanes peuvent charger des pages.
+- [~] Un client lent ne bloque pas les autres.
+- [~] Un client qui deconnecte pendant upload/download ne crash pas.
 - [ ] Stress test basique sans indisponibilite.
 
 ## Epic 4 - Parser HTTP robuste

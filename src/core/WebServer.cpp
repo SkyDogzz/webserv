@@ -32,6 +32,13 @@ void WebServer::appliConfig(Config& config)
 
 const Config* WebServer::getConfig() const { return _config; }
 
-void WebServer::run() { _event_loop.run(); }
+void WebServer::run()
+{
+    if (_config == NULL) {
+        std::cerr << "No configuration loaded" << std::endl;
+        return;
+    }
+    _event_loop.run(*_config);
+}
 
 bool WebServer::isRunning() { return _running; }

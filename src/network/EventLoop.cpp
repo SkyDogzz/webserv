@@ -361,22 +361,25 @@ static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
         conns.erase(it);
 }
 
-void EventLoop::run()
+void EventLoop::run(const Config& config)
 {
-    std::vector<ListeningSocket> listens;
-    listens.push_back(ListeningSocket("", "8080", 128));
-    listens.push_back(ListeningSocket("", "8081", 128));
+    if (config.servers.empty()) {
+        std::cerr << "No servers configured" << std::endl;
+        return;
+    }
 
-    DEBUG_LOG << "listening to socket 8080 8081" << std::endl;
-
+    std::vector<ListeningSocket> listens(config.servers.size());
     std::map<int, size_t> listen_map;
-    for (size_t i = 0; i < listens.size(); ++i) {
-        if (listens[i].getFd() == -1) {
-            std::cerr << "Failed to open listening socket on port " << listens[i].getPort() << std::endl;
+    for (size_t i = 0; i < config.servers.size(); ++i) {
+        const ServerConfig& server = config.servers[i];
+        std::ostringstream port;
+        port << server.port;
+        if (!listens[i].open(server.host, port.str(), 128)) {
+            std::cerr << "Failed to open listening socket on port " << server.port << std::endl;
             return;
         }
-        DEBUG_LOG << "Listening socket ready on port " << listens[i].getPort() << " fd=" << listens[i].getFd()
-                  << std::endl;
+        DEBUG_LOG << "Listening socket ready on host=" << (server.host.empty() ? "*" : server.host)
+                  << " port=" << server.port << " fd=" << listens[i].getFd() << std::endl;
         listen_map[listens[i].getFd()] = i;
     }
 
@@ -390,7 +393,6 @@ void EventLoop::run()
         listens[i].addToEpoll(epfd);
 
     std::map<int, Connection> conns;
-    const Config* config = WebServer::getInstance().getConfig();
 
     while (WebServer::getInstance().isRunning()) {
         expireTimedOutConnections(epfd, conns);
@@ -494,13 +496,13 @@ void EventLoop::run()
                     HttpResponse response;
                     response.status_code = 500;
 
-                    if (config != NULL && !config->servers.empty()) {
+                    if (!config.servers.empty()) {
                         std::map<int, size_t>::const_iterator listen_it = listen_map.find(conn.getListenFd());
                         int listen_port = 0;
                         if (listen_it != listen_map.end())
                             listen_port = std::atoi(listens[listen_it->second].getPort().c_str());
 
-                        Router router(*config);
+                        Router router(config);
                         RequestContext context;
                         if (router.resolve(listen_port, request, context)) {
                             if (!context.redirect_url.empty()) {
