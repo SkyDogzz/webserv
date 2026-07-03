@@ -34,7 +34,6 @@ flowchart TD
     Z --> AA{"keep-alive?"}
     AA -- "yes" --> L
     AA -- "no" --> AB["close connection"]
-end
 ```
 
 ## Lecture du schéma
