@@ -509,7 +509,7 @@ void EventLoop::run(const Config& config)
                                 int redirect_code = context.redirect_code != 0 ? context.redirect_code : 301;
                                 response = HttpResponse::makeRedirect(redirect_code, context.redirect_url, keep_alive);
                             } else {
-                                size_t max_body = context.server != NULL ? context.server->client_max_body_size : 0;
+                                size_t max_body = context.client_max_body_size;
                                 if (max_body > 0 && request.body.size() > max_body) {
                                     response = buildErrorResponse(413, keep_alive, &context);
                                 } else if (!isMethodAllowed(context, request.method)) {

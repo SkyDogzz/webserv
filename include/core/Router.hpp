@@ -32,6 +32,7 @@ struct RequestContext {
     std::map<std::string, std::string> cgi;
     std::map<int, std::string> error_pages;
     std::string upload_dir;
+    size_t client_max_body_size;
 
     RequestContext();
 };

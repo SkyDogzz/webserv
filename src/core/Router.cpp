@@ -9,6 +9,7 @@ RequestContext::RequestContext()
     , autoindex(false)
     , redirect_code(0)
     , redirect_url("")
+    , client_max_body_size(0)
 {
 }
 
@@ -78,6 +79,7 @@ bool Router::resolve(int listen_port, const HttpRequest& request, RequestContext
     context.server = server;
     context.root = server->root;
     context.index = server->index;
+    context.client_max_body_size = server->client_max_body_size;
 
     const LocationConfig* location = selectLocation(*server, Utils::normalizePathCopy(request.path));
     if (location != NULL) {
@@ -97,6 +99,8 @@ bool Router::resolve(int listen_port, const HttpRequest& request, RequestContext
             context.error_pages[it->first] = it->second;
         }
         context.upload_dir = location->upload_dir;
+        if (location->client_max_body_size != 0)
+            context.client_max_body_size = location->client_max_body_size;
     } else {
         context.error_pages = server->error_pages;
     }

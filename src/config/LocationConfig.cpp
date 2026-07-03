@@ -8,6 +8,7 @@ LocationConfig::LocationConfig()
     , redirect_code(0)
     , redirect_url("")
     , upload_dir("")
+    , client_max_body_size(0)
 {
 }
 
