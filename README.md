@@ -36,6 +36,59 @@ flowchart TD
     AA -- "no" --> AB["close connection"]
 ```
 
+## Configuration
+
+```mermaid
+flowchart TD
+    A["main.cpp"] --> B["Config object"]
+    B --> C["Config::validate()"]
+    C --> D["WebServer::appliConfig()"]
+    D --> E["WebServer stores Config"]
+    E --> F["Config.servers"]
+    F --> G["ServerConfig"]
+    G --> H["ServerConfig.locations"]
+    H --> I["LocationConfig"]
+    I --> J["root / index / methods / redirects"]
+```
+
+## Routing
+
+```mermaid
+flowchart TD
+    A["HttpRequest"] --> B["listen port"]
+    A --> C["host header"]
+    A --> D["path"]
+    B --> E["Router::selectServer()"]
+    C --> E
+    E --> F["ServerConfig"]
+    D --> G["Router::selectLocation()"]
+    F --> G
+    G --> H["LocationConfig"]
+    F --> I["merge server defaults"]
+    H --> I
+    I --> J["RequestContext"]
+    J --> K["StaticHandler"]
+```
+
+## Errors
+
+```mermaid
+flowchart TD
+    A["incoming request"] --> B{"request frame valid?"}
+    B -- "no" --> C["400 Bad Request"]
+    B -- "yes" --> D{"method allowed?"}
+    D -- "no" --> E["405 Method Not Allowed"]
+    D -- "yes" --> F{"body too large?"}
+    F -- "yes" --> G["413 Payload Too Large"]
+    F -- "no" --> H{"resource found?"}
+    H -- "no" --> I["404 Not Found"]
+    H -- "yes" --> J{"permission or path ok?"}
+    J -- "no" --> K["403 Forbidden"]
+    J -- "yes" --> L{"handler ok?"}
+    L -- "no" --> M["500 Internal Server Error"]
+    L -- "yes" --> N["response sent"]
+```
+
 ## Lecture du schéma
 
 - `main.cpp` charge la configuration, initialise `WebServer`, puis lance la boucle principale.
