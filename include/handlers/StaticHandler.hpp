@@ -20,6 +20,7 @@ private:
     std::string buildRedirectLocation(const std::string& target) const;
     std::string buildAutoindexBody(const std::string& dir_path, const std::string& uri) const;
     std::string htmlEscapeCopy(const std::string& value) const;
+    std::string buildUploadLocation(const std::string& request_path, const std::string& filename) const;
     HttpResponse makeErrorResponse(int status_code) const;
     HttpResponse handleGetOrHead(const HttpRequest& request) const;
     HttpResponse handlePost(const HttpRequest& request) const;

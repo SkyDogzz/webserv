@@ -114,6 +114,11 @@ std::string StaticHandler::buildAutoindexBody(const std::string& dir_path, const
     return out.str();
 }
 
+std::string StaticHandler::buildUploadLocation(const std::string& request_path, const std::string& filename) const
+{
+    return Utils::joinPathCopy(Utils::stripQueryCopy(request_path), filename);
+}
+
 HttpResponse StaticHandler::makeErrorResponse(int status_code) const
 {
     HttpResponse response = HttpResponse::makeError(status_code, false);
@@ -331,7 +336,7 @@ HttpResponse StaticHandler::handlePost(const HttpRequest& request) const
         return HttpResponse::makeError(500, false);
 
     HttpResponse response = HttpResponse::makeText(201, "<html><body><h1>Created</h1></body></html>", "text/html", false);
-    response.headers["Location"] = Utils::joinPathCopy(request.path, filename);
+    response.headers["Location"] = buildUploadLocation(request.path, filename);
     return response;
 }
 
