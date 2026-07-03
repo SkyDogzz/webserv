@@ -11,41 +11,27 @@ flowchart TD
     E --> F["apply config"]
     F --> G["run server"]
     G --> H["EventLoop"]
-
-    subgraph IO["Network layer"]
-        H --> I["ListeningSocket"]
-        I --> J["accept client"]
-        J --> K["Connection"]
-        K --> L["read socket"]
-        K --> M["write socket"]
-    end
-
-    subgraph HTTP["HTTP parsing"]
-        L --> N["HttpRequestParser"]
-        N --> O{"complete and valid?"}
-        O -- "no" --> P["HTTP 400"]
-        O -- "yes" --> Q["Router"]
-    end
-
-    subgraph ROUTING["Route resolution"]
-        Q --> R["ServerConfig"]
-        Q --> S["LocationConfig"]
-        R --> T["RequestContext"]
-        S --> T
-        T --> U["root / index / autoindex"]
-        T --> V["redirect / allow / cgi / errors / upload"]
-    end
-
-    subgraph HANDLER["Request handling"]
-        T --> W["StaticHandler"]
-        W --> X{"GET / HEAD / POST / DELETE"}
-        X --> Y["HttpResponse"]
-        P --> Y
-    end
-
-    Y --> Z["serialize response"]
-    Z --> M
-    M --> AA{"keep-alive?"}
+    H --> I["ListeningSocket"]
+    I --> J["accept client"]
+    J --> K["Connection"]
+    K --> L["read socket"]
+    L --> M["HttpRequestParser"]
+    M --> N{"complete and valid?"}
+    N -- "no" --> O["HTTP 400"]
+    N -- "yes" --> P["Router"]
+    P --> Q["ServerConfig"]
+    P --> R["LocationConfig"]
+    Q --> S["RequestContext"]
+    R --> S
+    S --> T["root / index / autoindex"]
+    S --> U["redirect / allow / cgi / errors / upload"]
+    S --> V["StaticHandler"]
+    V --> W{"GET / HEAD / POST / DELETE"}
+    W -- "unsupported" --> O
+    W -- "supported" --> X["HttpResponse"]
+    X --> Y["serialize response"]
+    Y --> Z["write socket"]
+    Z --> AA{"keep-alive?"}
     AA -- "yes" --> L
     AA -- "no" --> AB["close connection"]
 end
