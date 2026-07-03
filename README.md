@@ -4,50 +4,50 @@ Architecture globale du projet `webserv` et flux principal d'une requête HTTP.
 
 ```mermaid
 flowchart TD
-    A[main.cpp] --> B[Lecture de la config]
-    B --> C[Config]
-    C --> D[Config::validate()]
-    D --> E[WebServer::getInstance()]
-    E --> F[WebServer::appliConfig()]
-    F --> G[WebServer::run()]
-    G --> H[EventLoop::run()]
+    A["main.cpp"] --> B["Load config"]
+    B --> C["Config"]
+    C --> D["validate config"]
+    D --> E["WebServer singleton"]
+    E --> F["apply config"]
+    F --> G["run server"]
+    G --> H["EventLoop"]
 
-    subgraph IO["Couche réseau"]
-        H --> I[ListeningSocket]
-        I --> J[accept() client]
-        J --> K[Connection]
-        K --> L[readFromSocket()]
-        K --> M[writeToSocket()]
+    subgraph IO["Network layer"]
+        H --> I["ListeningSocket"]
+        I --> J["accept client"]
+        J --> K["Connection"]
+        K --> L["read socket"]
+        K --> M["write socket"]
     end
 
-    subgraph HTTP["Parsing HTTP"]
-        L --> N[HttpRequestParser::parse()]
-        N --> O{Requête complète et valide ?}
-        O -- non --> P[HttpResponse 400]
-        O -- oui --> Q[Router::resolve()]
+    subgraph HTTP["HTTP parsing"]
+        L --> N["HttpRequestParser"]
+        N --> O{"complete and valid?"}
+        O -- "no" --> P["HTTP 400"]
+        O -- "yes" --> Q["Router"]
     end
 
-    subgraph ROUTING["Résolution de route"]
-        Q --> R[ServerConfig]
-        Q --> S[LocationConfig]
-        R --> T[RequestContext]
+    subgraph ROUTING["Route resolution"]
+        Q --> R["ServerConfig"]
+        Q --> S["LocationConfig"]
+        R --> T["RequestContext"]
         S --> T
-        T --> U[root / index / autoindex]
-        T --> V[redirect / allow / cgi / error_pages / upload_dir]
+        T --> U["root / index / autoindex"]
+        T --> V["redirect / allow / cgi / errors / upload"]
     end
 
-    subgraph HANDLER["Traitement métier"]
-        T --> W[StaticHandler]
-        W --> X{GET / HEAD / POST / DELETE}
-        X --> Y[HttpResponse]
+    subgraph HANDLER["Request handling"]
+        T --> W["StaticHandler"]
+        W --> X{"GET / HEAD / POST / DELETE"}
+        X --> Y["HttpResponse"]
         P --> Y
     end
 
-    Y --> Z[HttpResponse::toString()]
+    Y --> Z["serialize response"]
     Z --> M
-    M --> AA{keep-alive ?}
-    AA -- oui --> L
-    AA -- non --> AB[Fermeture de la connexion]
+    M --> AA{"keep-alive?"}
+    AA -- "yes" --> L
+    AA -- "no" --> AB["close connection"]
 end
 ```
 
