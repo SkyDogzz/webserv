@@ -14,6 +14,7 @@ WebServer::WebServer()
     , _config(NULL)
 {
     signal(SIGINT, &WebServer::sigintHandler);
+    signal(SIGPIPE, SIG_IGN);
 }
 
 WebServer::~WebServer() { }

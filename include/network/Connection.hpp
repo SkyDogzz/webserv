@@ -35,6 +35,8 @@ public:
     void setKeepAlive(bool value);
     void markCloseAfterWrite();
     bool wantsWrite() const;
+    bool keepAlive() const;
+    bool closeAfterWriteRequested() const;
     bool shouldCloseAfterWrite() const;
     void markActivity();
     void markRequestStart();
