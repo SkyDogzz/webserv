@@ -2,7 +2,6 @@
 
 #include "../../include/http/HttpStatus.hpp"
 #include "../../include/utils/Utils.hpp"
-#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -279,10 +278,7 @@ bool CgiProcess::onWritable()
             closeInput();
         return true;
     }
-    if (written == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
-        return true;
-    failed_ = true;
-    return false;
+    return true;
 }
 
 bool CgiProcess::parseCgiOutput()
@@ -378,10 +374,7 @@ bool CgiProcess::onReadable()
             closeOutput();
             break;
         }
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            break;
-        failed_ = true;
-        return false;
+        break;
     }
 
     if (!parseCgiOutput())
