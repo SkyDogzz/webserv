@@ -94,6 +94,10 @@ void Connection::markCloseAfterWrite() { close_after_write = true; }
 
 bool Connection::wantsWrite() const { return !out_buffer.empty(); }
 
+bool Connection::keepAlive() const { return keep_alive; }
+
+bool Connection::closeAfterWriteRequested() const { return close_after_write; }
+
 bool Connection::shouldCloseAfterWrite() const
 {
     return close_after_write && !keep_alive && out_buffer.empty();

@@ -3,6 +3,7 @@
 #include "../../include/core/Router.hpp"
 #include "../../include/http/HttpRequestParser.hpp"
 #include "../../include/http/HttpStatus.hpp"
+#include "../../include/network/CgiProcess.hpp"
 #include "../../include/network/Connection.hpp"
 #include "../../include/network/ListeningSocket.hpp"
 #include "../../include/utils/DebugLogger.hpp"
@@ -18,10 +19,16 @@
 #include <sstream>
 #include <string>
 #include <set>
+#include <sys/stat.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <vector>
+
+static HttpResponse buildErrorResponse(int status_code, bool keep_alive, const RequestContext* context);
+static void finalizeResponse(HttpResponse& response, const HttpRequest& request, bool keep_alive);
+static bool isMethodAllowed(const RequestContext& context, const std::string& method);
+static long currentTimeMs();
 
 static bool parseChunkSizeLine(const std::string& line, std::size_t& chunk_size)
 {
@@ -258,6 +265,266 @@ static bool readWholeFile(const std::string& path, std::string& content)
     return true;
 }
 
+static bool hasCgiHandler(const RequestContext& context, const std::string& request_path, std::string& script_path,
+    std::string& interpreter_path)
+{
+    std::string::size_type slash = request_path.rfind('/');
+    std::string file_name = (slash == std::string::npos) ? request_path : request_path.substr(slash + 1);
+    std::string::size_type dot = file_name.rfind('.');
+    if (dot == std::string::npos)
+        return false;
+
+    std::string ext = file_name.substr(dot);
+    std::map<std::string, std::string>::const_iterator it = context.cgi.find(ext);
+    if (it == context.cgi.end())
+        return false;
+
+    script_path = Utils::joinPathCopy(context.root, Utils::stripQueryCopy(request_path));
+    interpreter_path = it->second;
+    return true;
+}
+
+struct CgiJobEntry {
+    CgiProcess process;
+};
+
+static void finalizeCgiJob(int epfd, std::map<int, Connection>& conns, std::map<int, CgiJobEntry>& cgi_jobs,
+    std::map<int, int>& cgi_fd_owner, int conn_fd, int status_code);
+
+static void removeCgiFds(int epfd, std::map<int, int>& cgi_fd_owner, const CgiProcess& process)
+{
+    int read_fd = process.getReadFd();
+    int write_fd = process.getWriteFd();
+    if (read_fd != -1) {
+        epoll_ctl(epfd, EPOLL_CTL_DEL, read_fd, NULL);
+        cgi_fd_owner.erase(read_fd);
+    }
+    if (write_fd != -1) {
+        epoll_ctl(epfd, EPOLL_CTL_DEL, write_fd, NULL);
+        cgi_fd_owner.erase(write_fd);
+    }
+}
+
+static void addCgiFd(int epfd, std::map<int, int>& cgi_fd_owner, int conn_fd, int fd, uint32_t events)
+{
+    if (fd == -1)
+        return;
+
+    struct epoll_event ev;
+    std::memset(&ev, 0, sizeof(ev));
+    ev.events = events;
+    ev.data.fd = fd;
+    epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+    cgi_fd_owner[fd] = conn_fd;
+}
+
+static bool startCgiForRequest(int epfd, std::map<int, int>& cgi_fd_owner, std::map<int, CgiJobEntry>& cgi_jobs,
+    int conn_fd, const HttpRequest& request, const RequestContext& context, const std::string& script_path,
+    const std::string& interpreter_path)
+{
+    CgiJobEntry entry;
+    if (!entry.process.start(request, context, script_path, interpreter_path))
+        return false;
+
+    addCgiFd(epfd, cgi_fd_owner, conn_fd, entry.process.getReadFd(), EPOLLIN);
+    addCgiFd(epfd, cgi_fd_owner, conn_fd, entry.process.getWriteFd(), EPOLLOUT);
+    cgi_jobs[conn_fd] = entry;
+    return true;
+}
+
+static bool handleParsedRequest(int epfd, const Config& config, std::vector<ListeningSocket>& listens,
+    std::map<int, size_t>& listen_map, std::map<int, CgiJobEntry>& cgi_jobs, std::map<int, int>& cgi_fd_owner,
+    Connection& conn, const std::string& request_raw, bool& started_cgi)
+{
+    started_cgi = false;
+
+    HttpRequest request;
+    bool ok = false;
+    try {
+        ok = HttpRequestParser::parse(request_raw, request);
+    } catch (std::exception& e) {
+        std::cerr << "Parse error: " << e.what() << std::endl;
+    }
+
+    DEBUG_LOG << "ok = " << ok << std::endl;
+    if (!ok) {
+        HttpResponse response = buildErrorResponse(400, false, NULL);
+        conn.out_buffer += response.toString();
+        conn.markCloseAfterWrite();
+        return false;
+    }
+
+    bool keep_alive = request.keep_alive;
+    conn.setKeepAlive(keep_alive);
+    if (!keep_alive)
+        conn.markCloseAfterWrite();
+
+    HttpResponse response;
+    response.status_code = 500;
+
+    if (!config.servers.empty()) {
+        std::map<int, size_t>::const_iterator listen_it = listen_map.find(conn.getListenFd());
+        int listen_port = 0;
+        if (listen_it != listen_map.end())
+            listen_port = std::atoi(listens[listen_it->second].getPort().c_str());
+
+        Router router(config);
+        RequestContext context;
+        if (router.resolve(listen_port, request, context)) {
+            if (!context.redirect_url.empty()) {
+                int redirect_code = context.redirect_code != 0 ? context.redirect_code : 301;
+                response = HttpResponse::makeRedirect(redirect_code, context.redirect_url, keep_alive);
+            } else {
+                std::size_t max_body = context.client_max_body_size;
+                if (max_body > 0 && request.body.size() > max_body) {
+                    response = buildErrorResponse(413, keep_alive, &context);
+                } else if (!isMethodAllowed(context, request.method)) {
+                    response = buildErrorResponse(405, keep_alive, &context);
+                } else {
+                    std::string script_path;
+                    std::string interpreter_path;
+                    if ((request.method == "GET" || request.method == "POST")
+                        && hasCgiHandler(context, request.path, script_path, interpreter_path)) {
+                        struct stat st;
+                        if (stat(script_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || access(script_path.c_str(), R_OK) != 0
+                            || access(interpreter_path.c_str(), X_OK) != 0) {
+                            response = buildErrorResponse(404, keep_alive, &context);
+                        } else if (!startCgiForRequest(epfd, cgi_fd_owner, cgi_jobs, conn.getFd(), request, context,
+                                       script_path, interpreter_path)) {
+                            response = buildErrorResponse(500, keep_alive, &context);
+                        } else {
+                            started_cgi = true;
+                            return true;
+                        }
+                    } else {
+                        StaticHandler staticHandler(context);
+                        response = staticHandler.handle(request);
+                    }
+                }
+            }
+        } else {
+            RequestContext fallback;
+            StaticHandler staticHandler(fallback);
+            response = staticHandler.handle(request);
+        }
+    } else {
+        RequestContext fallback;
+        StaticHandler staticHandler(fallback);
+        response = staticHandler.handle(request);
+    }
+
+    finalizeResponse(response, request, keep_alive);
+    conn.out_buffer += response.toString();
+    return true;
+}
+
+static void processBufferedRequests(int epfd, const Config& config, std::vector<ListeningSocket>& listens,
+    std::map<int, size_t>& listen_map, std::map<int, CgiJobEntry>& cgi_jobs, std::map<int, int>& cgi_fd_owner,
+    Connection& conn)
+{
+    while (cgi_jobs.find(conn.getFd()) == cgi_jobs.end()) {
+        size_t body_start = 0;
+        size_t content_length = 0;
+        RequestFrameStatus frame = requestComplete(conn.in_buffer, body_start, content_length);
+        if (frame == FRAME_INCOMPLETE)
+            break;
+        if (frame == FRAME_INVALID) {
+            HttpResponse response = buildErrorResponse(400, false, NULL);
+            conn.out_buffer += response.toString();
+            conn.in_buffer.clear();
+            conn.markCloseAfterWrite();
+            break;
+        }
+
+        std::string request_raw = conn.in_buffer.substr(0, body_start + content_length);
+        conn.in_buffer.erase(0, body_start + content_length);
+
+        bool started_cgi = false;
+        if (!handleParsedRequest(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn, request_raw,
+                started_cgi)) {
+            conn.in_buffer.clear();
+            break;
+        }
+        if (started_cgi)
+            break;
+        if (conn.closeAfterWriteRequested())
+            break;
+        if (conn.in_buffer.empty())
+            break;
+        conn.markRequestStart();
+    }
+}
+
+static void finalizeCgiJob(int epfd, std::map<int, Connection>& conns, std::map<int, CgiJobEntry>& cgi_jobs,
+    std::map<int, int>& cgi_fd_owner, int conn_fd, int status_code)
+{
+    std::map<int, Connection>::iterator conn_it = conns.find(conn_fd);
+    std::map<int, CgiJobEntry>::iterator job_it = cgi_jobs.find(conn_fd);
+    if (conn_it == conns.end() || job_it == cgi_jobs.end())
+        return;
+
+    Connection& conn = conn_it->second;
+    CgiProcess& process = job_it->second.process;
+    const HttpRequest& request = process.getRequest();
+
+    HttpResponse response;
+    if (status_code == 0) {
+        response = process.buildResponse(conn.keepAlive());
+        finalizeResponse(response, request, conn.keepAlive());
+    } else {
+        response = HttpResponse::makeError(status_code, conn.keepAlive());
+    }
+
+    removeCgiFds(epfd, cgi_fd_owner, process);
+    if (status_code == 0)
+        process.closeDescriptors();
+    else
+        process.abort();
+    cgi_jobs.erase(job_it);
+
+    conn.out_buffer += response.toString();
+    if (!conn.keepAlive())
+        conn.markCloseAfterWrite();
+}
+
+static void expireTimedOutCgiJobs(int epfd, std::map<int, Connection>& conns, std::map<int, CgiJobEntry>& cgi_jobs,
+    std::map<int, int>& cgi_fd_owner)
+{
+    const long cgi_timeout_ms = 15000;
+    const long now_ms = currentTimeMs();
+    std::vector<int> expired;
+
+    for (std::map<int, CgiJobEntry>::iterator it = cgi_jobs.begin(); it != cgi_jobs.end(); ++it) {
+        if (it->second.process.timedOut(now_ms, cgi_timeout_ms))
+            expired.push_back(it->first);
+    }
+
+    for (std::vector<int>::iterator it = expired.begin(); it != expired.end(); ++it)
+        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, *it, 504);
+}
+
+static void reapCompletedCgiJobs(int epfd, std::map<int, Connection>& conns, std::map<int, CgiJobEntry>& cgi_jobs,
+    std::map<int, int>& cgi_fd_owner, const Config& config, std::vector<ListeningSocket>& listens,
+    std::map<int, size_t>& listen_map)
+{
+    std::vector<int> finished;
+
+    for (std::map<int, CgiJobEntry>::iterator it = cgi_jobs.begin(); it != cgi_jobs.end(); ++it) {
+        CgiProcess& process = it->second.process;
+        if (process.reapIfFinished() && !process.wantsRead() && !process.hasFailed())
+            finished.push_back(it->first);
+    }
+
+    for (std::vector<int>::iterator it = finished.begin(); it != finished.end(); ++it) {
+        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, *it, 0);
+        std::map<int, Connection>::iterator conn_it = conns.find(*it);
+        if (conn_it != conns.end()) {
+            processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn_it->second);
+            conn_it->second.modEpoll(epfd, conn_it->second.wantsWrite());
+        }
+    }
+}
+
 static HttpResponse buildErrorResponse(int status_code, bool keep_alive, const RequestContext* context)
 {
     HttpResponse response = HttpResponse::makeError(status_code, keep_alive);
@@ -393,13 +660,17 @@ void EventLoop::run(const Config& config)
         listens[i].addToEpoll(epfd);
 
     std::map<int, Connection> conns;
+    std::map<int, CgiJobEntry> cgi_jobs;
+    std::map<int, int> cgi_fd_owner;
 
     while (WebServer::getInstance().isRunning()) {
         expireTimedOutConnections(epfd, conns);
+        expireTimedOutCgiJobs(epfd, conns, cgi_jobs, cgi_fd_owner);
+        reapCompletedCgiJobs(epfd, conns, cgi_jobs, cgi_fd_owner, config, listens, listen_map);
         if (listen_map.empty() && conns.empty())
             break;
         struct epoll_event events[64];
-        int n = epoll_wait(epfd, events, 64, -1);
+        int n = epoll_wait(epfd, events, 64, 1000);
         if (n == -1) {
             if (errno == EINTR)
                 continue;
@@ -409,6 +680,59 @@ void EventLoop::run(const Config& config)
 
         for (int i = 0; i < n; ++i) {
             int fd = events[i].data.fd;
+
+            std::map<int, int>::iterator cgi_owner_it = cgi_fd_owner.find(fd);
+            if (cgi_owner_it != cgi_fd_owner.end()) {
+                int conn_fd = cgi_owner_it->second;
+                std::map<int, CgiJobEntry>::iterator job_it = cgi_jobs.find(conn_fd);
+                std::map<int, Connection>::iterator conn_it = conns.find(conn_fd);
+                if (job_it == cgi_jobs.end() || conn_it == conns.end()) {
+                    cgi_fd_owner.erase(cgi_owner_it);
+                    epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+                    continue;
+                }
+
+                Connection& conn = conn_it->second;
+                CgiProcess& process = job_it->second.process;
+
+                if (events[i].events & (EPOLLHUP | EPOLLERR)) {
+                    finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
+                    conn.modEpoll(epfd, conn.wantsWrite());
+                    continue;
+                }
+
+                if (fd == process.getWriteFd()) {
+                    if (!process.onWritable()) {
+                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
+                        conn.modEpoll(epfd, conn.wantsWrite());
+                        continue;
+                    }
+                } else if (fd == process.getReadFd()) {
+                    if (!process.onReadable()) {
+                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
+                        conn.modEpoll(epfd, conn.wantsWrite());
+                        continue;
+                    }
+                }
+
+                if (job_it != cgi_jobs.end()) {
+                    CgiProcess& current_process = job_it->second.process;
+                    if (current_process.hasFailed()) {
+                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
+                        conn.modEpoll(epfd, conn.wantsWrite());
+                        continue;
+                    }
+                    if (!current_process.wantsRead() && current_process.reapIfFinished()) {
+                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 0);
+                        processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
+                        conn.modEpoll(epfd, conn.wantsWrite());
+                        continue;
+                    }
+                    conn.modEpoll(epfd, conn.wantsWrite());
+                    continue;
+                }
+                continue;
+            }
 
             if (listen_map.find(fd) != listen_map.end()) {
                 if (events[i].events & (EPOLLHUP | EPOLLERR)) {
@@ -453,90 +777,12 @@ void EventLoop::run(const Config& config)
                 conn.markActivity();
                 if (peer_closed)
                     conn.markCloseAfterWrite();
-                while (true) {
-                    size_t body_start = 0;
-                    size_t content_length = 0;
-                    RequestFrameStatus frame = requestComplete(conn.in_buffer, body_start, content_length);
-                    if (frame == FRAME_INCOMPLETE)
-                        break;
+                processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
 
-                    if (frame == FRAME_INVALID) {
-                        HttpResponse response = buildErrorResponse(400, false, NULL);
-                        conn.out_buffer += response.toString();
-                        conn.in_buffer.clear();
-                        conn.markCloseAfterWrite();
-                        break;
-                    }
-
-                    std::string request_raw = conn.in_buffer.substr(0, body_start + content_length);
-                    conn.in_buffer.erase(0, body_start + content_length);
-
-                    HttpRequest request;
-                    bool ok = false;
-                    try {
-                        ok = HttpRequestParser::parse(request_raw, request);
-                    } catch (std::exception& e) {
-                        std::cerr << "Parse error: " << e.what() << std::endl;
-                    }
-
-                    DEBUG_LOG << "ok = " << ok << std::endl;
-                    if (!ok) {
-                        HttpResponse response = buildErrorResponse(400, false, NULL);
-                        conn.out_buffer += response.toString();
-                        conn.markCloseAfterWrite();
-                        conn.in_buffer.clear();
-                        break;
-                    }
-
-                    bool keep_alive = request.keep_alive;
-                    conn.setKeepAlive(keep_alive);
-                    if (!keep_alive)
-                        conn.markCloseAfterWrite();
-
-                    HttpResponse response;
-                    response.status_code = 500;
-
-                    if (!config.servers.empty()) {
-                        std::map<int, size_t>::const_iterator listen_it = listen_map.find(conn.getListenFd());
-                        int listen_port = 0;
-                        if (listen_it != listen_map.end())
-                            listen_port = std::atoi(listens[listen_it->second].getPort().c_str());
-
-                        Router router(config);
-                        RequestContext context;
-                        if (router.resolve(listen_port, request, context)) {
-                            if (!context.redirect_url.empty()) {
-                                int redirect_code = context.redirect_code != 0 ? context.redirect_code : 301;
-                                response = HttpResponse::makeRedirect(redirect_code, context.redirect_url, keep_alive);
-                            } else {
-                                size_t max_body = context.client_max_body_size;
-                                if (max_body > 0 && request.body.size() > max_body) {
-                                    response = buildErrorResponse(413, keep_alive, &context);
-                                } else if (!isMethodAllowed(context, request.method)) {
-                                    response = buildErrorResponse(405, keep_alive, &context);
-                                } else {
-                                    StaticHandler staticHandler(context);
-                                    response = staticHandler.handle(request);
-                                }
-                            }
-                        } else {
-                            RequestContext fallback;
-                            StaticHandler staticHandler(fallback);
-                            response = staticHandler.handle(request);
-                        }
-                    } else {
-                        RequestContext fallback;
-                        StaticHandler staticHandler(fallback);
-                        response = staticHandler.handle(request);
-                    }
-
-                    finalizeResponse(response, request, keep_alive);
-                    conn.out_buffer += response.toString();
-                    if (!keep_alive)
-                        break;
-                    if (conn.in_buffer.empty())
-                        break;
-                    conn.markRequestStart();
+                if (peer_closed && cgi_jobs.find(fd) != cgi_jobs.end()) {
+                    finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, fd, 500);
+                    closeConnection(epfd, conns, fd);
+                    continue;
                 }
 
                 if (peer_closed && !conn.wantsWrite()) {
