@@ -211,7 +211,7 @@ bool pushHeader(const std::string& line, HttpRequest& request)
     return true;
 }
 
-void printRequest(HttpRequest& request)
+void printRequest(const HttpRequest& request)
 {
     DEBUG_LOG << "First line" << std::endl;
     DEBUG_LOG << "Method: \"" << request.method << "\"" << std::endl;
@@ -220,8 +220,8 @@ void printRequest(HttpRequest& request)
     DEBUG_LOG << std::endl;
 
     DEBUG_LOG << "Headers" << std::endl;
-    std::map<std::string, std::string>::iterator it;
-    for (it = request.headers.begin(); it != request.headers.end(); it++) {
+    std::map<std::string, std::string>::const_iterator it;
+    for (it = request.headers.begin(); it != request.headers.end(); ++it) {
         DEBUG_LOG << it->first << " :" << it->second << std::endl;
     }
     DEBUG_LOG << std::endl;

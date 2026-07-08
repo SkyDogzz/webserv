@@ -6,7 +6,7 @@
 #include "../include/core/WebServer.hpp"
 #include "../include/utils/DebugLogger.hpp"
 
-int main(int argc, char* argv[])
+int main(int argc, const char* argv[])
 {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;

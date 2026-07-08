@@ -715,22 +715,19 @@ void EventLoop::run(const Config& config)
                     }
                 }
 
-                if (job_it != cgi_jobs.end()) {
-                    CgiProcess& current_process = job_it->second.process;
-                    if (current_process.hasFailed()) {
-                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
-                        conn.modEpoll(epfd, conn.wantsWrite());
-                        continue;
-                    }
-                    if (!current_process.wantsRead() && current_process.reapIfFinished()) {
-                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 0);
-                        processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
-                        conn.modEpoll(epfd, conn.wantsWrite());
-                        continue;
-                    }
+                CgiProcess& current_process = job_it->second.process;
+                if (current_process.hasFailed()) {
+                    finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
                     conn.modEpoll(epfd, conn.wantsWrite());
                     continue;
                 }
+                if (!current_process.wantsRead() && current_process.reapIfFinished()) {
+                    finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 0);
+                    processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
+                    conn.modEpoll(epfd, conn.wantsWrite());
+                    continue;
+                }
+                conn.modEpoll(epfd, conn.wantsWrite());
                 continue;
             }
 

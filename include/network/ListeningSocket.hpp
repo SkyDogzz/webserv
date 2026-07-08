@@ -27,8 +27,8 @@ public:
     void closeSocket();
 
     int getFd() const;
-    std::string getHost() const;
-    std::string getPort() const;
+    const std::string& getHost() const;
+    const std::string& getPort() const;
     bool isOpen() const;
 
 private:

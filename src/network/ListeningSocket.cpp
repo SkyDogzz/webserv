@@ -138,8 +138,8 @@ void ListeningSocket::closeSocket()
 
 int ListeningSocket::getFd() const { return fd; }
 
-std::string ListeningSocket::getHost() const { return host_; }
+const std::string& ListeningSocket::getHost() const { return host_; }
 
-std::string ListeningSocket::getPort() const { return port_; }
+const std::string& ListeningSocket::getPort() const { return port_; }
 
 bool ListeningSocket::isOpen() const { return fd != -1; }

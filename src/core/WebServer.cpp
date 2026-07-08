@@ -42,4 +42,4 @@ void WebServer::run()
     _event_loop.run(*_config);
 }
 
-bool WebServer::isRunning() { return _running; }
+bool WebServer::isRunning() const { return _running; }

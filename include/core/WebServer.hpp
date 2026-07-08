@@ -38,7 +38,7 @@ public:
     void appliConfig(Config& config);
     const Config* getConfig() const;
     void run();
-    bool isRunning();
+    bool isRunning() const;
 };
 
 #endif

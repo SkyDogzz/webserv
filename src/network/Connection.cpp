@@ -23,27 +23,27 @@ Connection::Connection()
 {
 }
 
-Connection::Connection(int fd, int listen_fd)
-    : fd(fd)
-    , listen_fd(listen_fd)
+Connection::Connection(int client_fd, int listen_fd_arg)
+    : fd(client_fd)
+    , listen_fd(listen_fd_arg)
     , keep_alive(false)
     , close_after_write(false)
     , last_activity_ms(currentTimeMs())
     , request_start_ms(currentTimeMs())
 {
-    Utils::makeNonBlocking(fd);
+    Utils::makeNonBlocking(client_fd);
 }
 
-void Connection::init(int fd, int listen_fd)
+void Connection::init(int client_fd, int listen_fd_arg)
 {
     Utils::closeFdSafe(this->fd);
-    this->fd = fd;
-    this->listen_fd = listen_fd;
+    this->fd = client_fd;
+    this->listen_fd = listen_fd_arg;
     keep_alive = false;
     close_after_write = false;
     last_activity_ms = currentTimeMs();
     request_start_ms = currentTimeMs();
-    Utils::makeNonBlocking(fd);
+    Utils::makeNonBlocking(client_fd);
 }
 
 Connection::~Connection()

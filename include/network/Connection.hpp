@@ -22,10 +22,10 @@
 class Connection {
 public:
     Connection();
-    Connection(int fd, int listen_fd);
+    Connection(int client_fd, int listen_fd_arg);
     ~Connection();
 
-    void init(int fd, int listen_fd);
+    void init(int client_fd, int listen_fd_arg);
     int getFd() const;
     int getListenFd() const;
 
