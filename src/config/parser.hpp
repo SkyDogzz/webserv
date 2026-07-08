@@ -7,7 +7,7 @@
 
 class Parser {
 public:
-    Parser(Lexer& lexer);
+    explicit Parser(Lexer& lexer);
     ~Parser();
     JsonValue* parse();
 
