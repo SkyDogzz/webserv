@@ -37,7 +37,7 @@ public:
     static WebServer& getInstance();
     void appliConfig(Config& config);
     const Config* getConfig() const;
-    static void run();
+    void run();
     bool isRunning();
 };
 

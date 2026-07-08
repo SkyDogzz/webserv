@@ -23,7 +23,7 @@ SRCS := $(addprefix $(SRC_PATH), $(SRC))
 OBJS := $(addprefix $(OBJ_PATH), $(SRC:.cpp=.o))
 CPPCHECK := cppcheck
 CPPCHECK_FLAGS := --enable=all --inconclusive --std=c++98 --force --inline-suppr -I ./include \
-	--suppress=unusedFunction --suppress=missingIncludeSystem
+	--suppress=unusedFunction --suppress=unusedPrivateFunction --suppress=missingIncludeSystem
 FORMAT := clang-format
 FORMAT_FILES := $(shell find src include -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \))
 

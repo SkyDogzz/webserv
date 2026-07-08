@@ -332,7 +332,7 @@ static bool startCgiForRequest(int epfd, std::map<int, int>& cgi_fd_owner, std::
     return true;
 }
 
-static bool handleParsedRequest(int epfd, const Config& config, std::vector<ListeningSocket>& listens,
+static bool handleParsedRequest(int epfd, const Config& config, const std::vector<ListeningSocket>& listens,
     std::map<int, size_t>& listen_map, std::map<int, CgiJobEntry>& cgi_jobs, std::map<int, int>& cgi_fd_owner,
     Connection& conn, const std::string& request_raw, bool& started_cgi)
 {
@@ -418,7 +418,7 @@ static bool handleParsedRequest(int epfd, const Config& config, std::vector<List
     return true;
 }
 
-static void processBufferedRequests(int epfd, const Config& config, std::vector<ListeningSocket>& listens,
+static void processBufferedRequests(int epfd, const Config& config, const std::vector<ListeningSocket>& listens,
     std::map<int, size_t>& listen_map, std::map<int, CgiJobEntry>& cgi_jobs, std::map<int, int>& cgi_fd_owner,
     Connection& conn)
 {
@@ -504,7 +504,7 @@ static void expireTimedOutCgiJobs(int epfd, std::map<int, Connection>& conns, st
 }
 
 static void reapCompletedCgiJobs(int epfd, std::map<int, Connection>& conns, std::map<int, CgiJobEntry>& cgi_jobs,
-    std::map<int, int>& cgi_fd_owner, const Config& config, std::vector<ListeningSocket>& listens,
+    std::map<int, int>& cgi_fd_owner, const Config& config, const std::vector<ListeningSocket>& listens,
     std::map<int, size_t>& listen_map)
 {
     std::vector<int> finished;
@@ -739,7 +739,7 @@ void EventLoop::run(const Config& config)
                     closeListeningSocket(epfd, listens, listen_map, fd);
                     continue;
                 }
-                ListeningSocket& listen = listens[listen_map[fd]];
+                const ListeningSocket& listen = listens[listen_map[fd]];
                 for (;;) {
                     int client_fd = listen.acceptClient();
                     if (client_fd == -1)
