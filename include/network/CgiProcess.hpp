@@ -62,7 +62,7 @@ private:
     static std::string trimHeaderValue(const std::string& value);
     static bool parseStatusHeader(const std::string& value, int& status_code);
     static void setNonBlocking(int fd);
-    std::string buildEnvString(const std::string& key, const std::string& value) const;
+    static std::string buildEnvString(const std::string& key, const std::string& value);
 };
 
 #endif

@@ -19,7 +19,7 @@
 
 class EventLoop {
 public:
-    void run(const Config& config);
+    static void run(const Config& config);
 };
 
 #endif

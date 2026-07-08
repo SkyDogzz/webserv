@@ -121,7 +121,7 @@ bool CgiProcess::parseStatusHeader(const std::string& value, int& status_code)
     return true;
 }
 
-std::string CgiProcess::buildEnvString(const std::string& key, const std::string& value) const
+std::string CgiProcess::buildEnvString(const std::string& key, const std::string& value)
 {
     return key + "=" + value;
 }

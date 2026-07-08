@@ -47,7 +47,7 @@ private:
     const Config& config_;
 
     const ServerConfig* selectServer(int listen_port, const HttpRequest& request) const;
-    const LocationConfig* selectLocation(const ServerConfig& server, const std::string& path) const;
+    static const LocationConfig* selectLocation(const ServerConfig& server, const std::string& path);
     static std::string hostWithoutPort(const std::string& host);
 };
 

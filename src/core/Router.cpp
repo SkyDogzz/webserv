@@ -50,7 +50,7 @@ const ServerConfig* Router::selectServer(int listen_port, const HttpRequest& req
     return &config_.servers.front();
 }
 
-const LocationConfig* Router::selectLocation(const ServerConfig& server, const std::string& path) const
+const LocationConfig* Router::selectLocation(const ServerConfig& server, const std::string& path)
 {
     const LocationConfig* best = NULL;
     std::size_t best_len = 0;

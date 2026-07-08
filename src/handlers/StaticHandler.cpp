@@ -39,7 +39,7 @@ std::string StaticHandler::buildGetPath(const std::string& uri, const std::strin
     return Utils::joinPathCopy(context_.root, path);
 }
 
-std::string StaticHandler::buildRedirectLocation(const std::string& target) const
+std::string StaticHandler::buildRedirectLocation(const std::string& target)
 {
     std::string location = target;
     std::string query;
@@ -55,7 +55,7 @@ std::string StaticHandler::buildRedirectLocation(const std::string& target) cons
     return location + query;
 }
 
-std::string StaticHandler::htmlEscapeCopy(const std::string& value) const
+std::string StaticHandler::htmlEscapeCopy(const std::string& value)
 {
     std::string escaped;
     escaped.reserve(value.size());
@@ -75,7 +75,7 @@ std::string StaticHandler::htmlEscapeCopy(const std::string& value) const
     return escaped;
 }
 
-std::string StaticHandler::buildAutoindexBody(const std::string& dir_path, const std::string& uri) const
+std::string StaticHandler::buildAutoindexBody(const std::string& dir_path, const std::string& uri)
 {
     DIR* dir = opendir(dir_path.c_str());
     if (dir == NULL)
@@ -114,7 +114,7 @@ std::string StaticHandler::buildAutoindexBody(const std::string& dir_path, const
     return out.str();
 }
 
-std::string StaticHandler::buildUploadLocation(const std::string& request_path, const std::string& filename) const
+std::string StaticHandler::buildUploadLocation(const std::string& request_path, const std::string& filename)
 {
     return Utils::joinPathCopy(Utils::stripQueryCopy(request_path), filename);
 }
@@ -154,7 +154,7 @@ HttpResponse StaticHandler::makeErrorResponse(int status_code) const
     return response;
 }
 
-std::string StaticHandler::makeUploadFilename(const std::string& hint) const
+std::string StaticHandler::makeUploadFilename(const std::string& hint)
 {
     static unsigned long counter = 0;
     std::ostringstream out;
@@ -170,7 +170,7 @@ std::string StaticHandler::makeUploadFilename(const std::string& hint) const
     return out.str();
 }
 
-std::string StaticHandler::guessMimeType(const std::string& path) const
+std::string StaticHandler::guessMimeType(const std::string& path)
 {
     std::size_t dot = path.rfind('.');
     DEBUG_LOG << "find dot ?: " << dot << std::endl;
