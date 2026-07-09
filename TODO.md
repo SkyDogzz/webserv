@@ -238,6 +238,144 @@ Objectif: choisir la bonne configuration effective pour chaque requete.
 - [x] Normaliser les paths pour eviter les traversals.
 - [x] Preparer un objet `RequestContext` donne aux handlers.
 
+## Epic 6 - Banque de tests et fixtures
+
+Objectif: disposer d'un environnement de test large, simple a lancer, et assez
+riche pour casser les regressions rapidement.
+
+- [ ] Centraliser les assets de test dans une arborescence stable:
+  - `www/tests/` pour le contenu statique accessible par HTTP.
+  - `errors/` pour toutes les pages d'erreur.
+  - `tests/fixtures/cgi/` pour les scripts CGI.
+  - `tests/fixtures/request_bodies/` pour les payloads bruts.
+  - `www/uploads/` pour les fichiers generés par upload.
+- [ ] Ajouter une page d'accueil de test avec liens vers:
+  - HTML simple.
+  - CSS.
+  - JavaScript.
+  - JSON.
+  - pages d'erreur.
+  - CGI GET.
+  - CGI POST.
+  - CGI multipart.
+  - upload.
+- [ ] Couvrir les methodes HTTP:
+  - GET.
+  - HEAD.
+  - POST.
+  - DELETE.
+  - methodes interdites.
+- [ ] Couvrir les cas de parsing de requete:
+  - requete complete.
+  - requete tronquee.
+  - plusieurs requetes dans le meme buffer.
+  - `Content-Length` absent.
+  - `Content-Length` invalide.
+  - corps vide.
+  - corps trop grand.
+  - `Transfer-Encoding: chunked`.
+  - chunk invalide.
+  - headers dupliques.
+  - `Host` absent sur HTTP/1.1.
+  - line endings `\r\n` et cas fautifs.
+- [ ] Couvrir le routage:
+  - racine par defaut.
+  - prefixes longs.
+  - `location` imbriquees.
+  - redirections.
+  - root different par location.
+  - index different par location.
+- [ ] Couvrir les reponses statiques:
+  - fichier HTML.
+  - fichier texte.
+  - fichier JSON.
+  - fichier JS.
+  - fichier vide.
+  - fichier gros.
+  - fichier inexistant.
+  - permission refusee.
+- [ ] Couvrir les erreurs:
+  - 400 Bad Request.
+  - 403 Forbidden.
+  - 404 Not Found.
+  - 405 Method Not Allowed.
+  - 413 Payload Too Large.
+  - 500 Internal Server Error.
+  - pages d'erreur personnalisees.
+- [ ] Couvrir CGI:
+  - echo de `QUERY_STRING`.
+  - echo des headers.
+  - echo du body.
+  - requete GET.
+  - requete POST.
+  - multipart/form-data.
+  - status CGI custom.
+  - variable `SCRIPT_FILENAME`.
+  - variable `CONTENT_LENGTH`.
+- [ ] Couvrir upload:
+  - upload simple.
+  - upload avec nom de fichier.
+  - upload vide.
+  - upload trop gros.
+  - upload sur chemin interdit.
+  - fichier ecrit au bon endroit.
+  - collision de nom.
+- [ ] Couvrir l'I/O et la robustesse:
+  - client lent.
+  - plusieurs clients simultanes.
+  - fermeture brutale cote client.
+  - requete partielle.
+  - reponse partielle.
+  - keep-alive.
+  - fermeture explicite `Connection: close`.
+  - timeout d'header.
+  - timeout de body.
+  - timeout keep-alive.
+- [ ] Couvrir la configuration:
+  - config minimale.
+  - multi-server.
+  - multi-port.
+  - host different.
+  - body limit different.
+  - `error_page`.
+  - `autoindex`.
+  - `cgi`.
+  - `upload_dir`.
+- [ ] Ajouter des fichiers de test concrets:
+  - `www/tests/index.html`
+  - `www/tests/plain.txt`
+  - `www/tests/data.json`
+  - `www/tests/data.js`
+  - `www/tests/style.css`
+  - `errors/400.html`
+  - `errors/403.html`
+  - `errors/405.html`
+  - `errors/413.html`
+  - `errors/500.html`
+  - `tests/fixtures/cgi/headers.py`
+  - `tests/fixtures/cgi/status.py`
+  - `tests/fixtures/cgi/multipart_echo.py`
+  - `tests/fixtures/request_bodies/simple_multipart.txt`
+  - `tests/fixtures/request_bodies/chunked_post.txt`
+- [ ] Ajouter un petit protocole de validation manuelle:
+  - lancer `./webserv config.json`.
+  - verifier `GET /`.
+  - verifier `GET /tests/`.
+  - verifier `GET /tests/data.json`.
+  - verifier `GET /cgi-bin/echo.py?x=1`.
+  - verifier `POST /cgi-bin/echo.py`.
+  - verifier `POST multipart/form-data`.
+  - verifier une 404.
+  - verifier une 405.
+  - verifier un upload.
+  - verifier un body trop grand.
+
+Validation:
+
+- [ ] Un jeu de fixtures couvre au moins un cas nominal et un cas d'erreur pour chaque grosse fonctionnalite.
+- [ ] Le depot contient une page d'entree unique pour naviguer vers tous les tests.
+- [ ] Aucun ajout de test ne depend d'un etat manuel fragile hors depot.
+
 Validation:
 
 - [ ] Deux ports peuvent servir deux roots differents.

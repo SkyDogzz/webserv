@@ -4,7 +4,7 @@
 			"listen": "8111",
 			"server_name": "localhost",
 			"error_pages": {
-				"404": "/errors/404.html"
+				"404": "errors/404.html"
 			},
 			"locations": {
 				"/": {
@@ -13,10 +13,29 @@
 					"index": "index.html",
 					"autoindex": false
 				},
+				"/tests": {
+					"methods": ["GET"],
+					"root": "./www/tests",
+					"index": "index.html",
+					"autoindex": false
+				},
+				"/errors": {
+					"methods": ["GET", "HEAD"],
+					"root": ".",
+					"index": "404.html",
+					"autoindex": false
+				},
 				"/cgi-bin": {
 					"methods": ["GET", "POST"],
 					"cgi_path": "/usr/bin/python3",
 					"cgi_ext": ".py",
+					"upload_enable": true,
+					"upload_store": "./www/uploads"
+				},
+				"/upload": {
+					"methods": ["POST"],
+					"root": "./www/uploads",
+					"autoindex": false,
 					"upload_enable": true,
 					"upload_store": "./www/uploads"
 				}

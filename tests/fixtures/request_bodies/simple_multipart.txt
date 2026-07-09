@@ -1,0 +1,10 @@
+--webservboundary
+Content-Disposition: form-data; name="title"
+
+webserv
+--webservboundary
+Content-Disposition: form-data; name="file"; filename="sample.txt"
+Content-Type: text/plain
+
+sample upload content
+--webservboundary--

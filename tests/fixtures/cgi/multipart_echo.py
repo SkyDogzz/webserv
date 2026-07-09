@@ -14,17 +14,21 @@ def read_body():
     return sys.stdin.read(length)
 
 
+def esc(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def main():
     body = read_body()
     print("Content-Type: text/html")
     print()
     print("<html><body>")
-    print("<h1>CGI echo</h1>")
+    print("<h1>CGI multipart echo</h1>")
     print("<ul>")
-    for key in ["REQUEST_METHOD", "SCRIPT_NAME", "SCRIPT_FILENAME", "QUERY_STRING", "CONTENT_LENGTH", "CONTENT_TYPE"]:
-        print("<li>{0}={1}</li>".format(key, os.environ.get(key, "")))
+    for key in ["REQUEST_METHOD", "CONTENT_TYPE", "CONTENT_LENGTH", "QUERY_STRING"]:
+        print("<li>{0}={1}</li>".format(key, esc(os.environ.get(key, ""))))
     print("</ul>")
-    print("<pre>{}</pre>".format(body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")))
+    print("<pre>{0}</pre>".format(esc(body)))
     print("</body></html>")
 
 
