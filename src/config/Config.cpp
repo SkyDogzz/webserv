@@ -194,3 +194,9 @@ Config::Config(JsonValue *obj) {
         this->servers.push_back(s);
     }
 }
+
+void Config::validate() const {
+    if (servers.empty()) {
+        throw std::runtime_error("Configuration must define at least one server");
+    }
+}

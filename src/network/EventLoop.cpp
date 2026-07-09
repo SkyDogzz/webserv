@@ -628,42 +628,29 @@ static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
         conns.erase(it);
 }
 
-void EventLoop::run(Config* config)
+void EventLoop::run(const Config& config)
 {
-    if (!config) {
-        std::cerr << "No configuration provided to EventLoop" << std::endl;
-        return;
-    }
-
-    std::vector<ListeningSocket> listens;
-    for (size_t i = 0; i < config->servers.size(); ++i) {
-        std::ostringstream oss;
-        oss << config->servers[i].port;
-        listens.push_back(ListeningSocket(config->servers[i].host, oss.str(), 128));
-    }
-
-    if (listens.empty()) {
+    if (config.servers.empty()) {
         std::cerr << "No servers configured" << std::endl;
         return;
     }
 
-    std::vector<ListeningSocket> listens(config.servers.size());
+    std::vector<ListeningSocket> listens;
     std::map<int, size_t> listen_map;
-    for (size_t i = 0; i < listens.size(); ++i) {
-        if (listens[i].getFd() == -1) {
-            std::cerr << "Failed to open listening socket on port " << listens[i].getPort() << std::endl;
-            continue;
     for (size_t i = 0; i < config.servers.size(); ++i) {
         const ServerConfig& server = config.servers[i];
         std::ostringstream port;
         port << server.port;
-        if (!listens[i].open(server.host, port.str(), 128)) {
+
+        ListeningSocket sock;
+        if (!sock.open(server.host, port.str(), 128)) {
             std::cerr << "Failed to open listening socket on port " << server.port << std::endl;
-            return;
+            continue;
         }
+        listens.push_back(sock);
+        listen_map[listens.back().getFd()] = listens.size() - 1;
         DEBUG_LOG << "Listening socket ready on host=" << (server.host.empty() ? "*" : server.host)
-                  << " port=" << server.port << " fd=" << listens[i].getFd() << std::endl;
-        listen_map[listens[i].getFd()] = i;
+                  << " port=" << server.port << " fd=" << sock.getFd() << std::endl;
     }
 
     if (listen_map.empty()) {
@@ -672,15 +659,13 @@ void EventLoop::run(Config* config)
     }
 
     int epfd = epoll_create1(0);
-    int epfd = epoll_create(1);
     if (epfd == -1) {
         std::cerr << "epoll_create failed: " << std::strerror(errno) << std::endl;
         return;
     }
 
-    for (std::map<int, size_t>::iterator it = listen_map.begin(); it != listen_map.end(); ++it) {
-        listens[it->second].addToEpoll(epfd);
-    }
+    for (size_t i = 0; i < listens.size(); ++i)
+        listens[i].addToEpoll(epfd);
 
     std::map<int, Connection> conns;
     std::map<int, CgiJobEntry> cgi_jobs;
@@ -690,8 +675,10 @@ void EventLoop::run(Config* config)
         expireTimedOutConnections(epfd, conns);
         expireTimedOutCgiJobs(epfd, conns, cgi_jobs, cgi_fd_owner);
         reapCompletedCgiJobs(epfd, conns, cgi_jobs, cgi_fd_owner, config, listens, listen_map);
+
         if (listen_map.empty() && conns.empty())
             break;
+
         struct epoll_event events[64];
         int n = epoll_wait(epfd, events, 64, 1000);
         if (n == -1) {
@@ -738,28 +725,31 @@ void EventLoop::run(Config* config)
                     }
                 }
 
-                CgiProcess& current_process = job_it->second.process;
-                if (current_process.hasFailed()) {
+                if (process.hasFailed()) {
                     finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
                     conn.modEpoll(epfd, conn.wantsWrite());
                     continue;
                 }
-                if (!current_process.wantsRead() && current_process.reapIfFinished()) {
+
+                if (!process.wantsRead() && process.reapIfFinished()) {
                     finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 0);
                     processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
                     conn.modEpoll(epfd, conn.wantsWrite());
                     continue;
                 }
+
                 conn.modEpoll(epfd, conn.wantsWrite());
                 continue;
             }
 
-            if (listen_map.find(fd) != listen_map.end()) {
+            std::map<int, size_t>::iterator listen_it = listen_map.find(fd);
+            if (listen_it != listen_map.end()) {
                 if (events[i].events & (EPOLLHUP | EPOLLERR)) {
                     closeListeningSocket(epfd, listens, listen_map, fd);
                     continue;
                 }
-                const ListeningSocket& listen = listens[listen_map[fd]];
+
+                const ListeningSocket& listen = listens[listen_it->second];
                 for (;;) {
                     int client_fd = listen.acceptClient();
                     if (client_fd == -1)
@@ -773,10 +763,10 @@ void EventLoop::run(Config* config)
                 continue;
             }
 
-            std::map<int, Connection>::iterator it = conns.find(fd);
-            if (it == conns.end())
+            std::map<int, Connection>::iterator conn_it = conns.find(fd);
+            if (conn_it == conns.end())
                 continue;
-            Connection& conn = it->second;
+            Connection& conn = conn_it->second;
 
             if (events[i].events & (EPOLLHUP | EPOLLERR)) {
                 closeConnection(epfd, conns, fd);
@@ -798,58 +788,6 @@ void EventLoop::run(Config* config)
                 if (peer_closed)
                     conn.markCloseAfterWrite();
                 processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
-
-                if (peer_closed && cgi_jobs.find(fd) != cgi_jobs.end()) {
-                    finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, fd, 500);
-                    closeConnection(epfd, conns, fd);
-                    continue;
-                }
-
-                    bool keep_alive = false;
-                    std::cout << "ok = " << ok << std::endl;
-                    if (ok) {
-                        std::map<std::string, std::string>::iterator hit = request.headers.find("Connection");
-                        if (hit != request.headers.end()) {
-                            keep_alive = (hit->second == "keep-alive");
-                        } else {
-                            keep_alive = (request.version == "HTTP/1.1");
-                        }
-                    }
-                    conn.setKeepAlive(keep_alive);
-                    if (!keep_alive)
-                        conn.markCloseAfterWrite();
-
-                    if (!ok)
-                        conn.out_buffer = buildSimpleResponse(400, "Bad Request", keep_alive);
-                    else {
-                        int listen_fd = conn.getListenFd();
-                        size_t srv_idx = listen_map[listen_fd];
-                        const ServerConfig& srv_cfg = config->servers[srv_idx];
-                        
-                        // Find the best matching location (longest prefix)
-                        const LocationConfig* best_loc = NULL;
-                        for (size_t j = 0; j < srv_cfg.locations.size(); ++j) {
-                            if (request.path.find(srv_cfg.locations[j].path) == 0) {
-                                if (!best_loc || srv_cfg.locations[j].path.length() > best_loc->path.length()) {
-                                    best_loc = &srv_cfg.locations[j];
-                                }
-                            }
-                        }
-
-                        std::string root = srv_cfg.root;
-                        if (best_loc && !best_loc->root.empty()) {
-                            root = best_loc->root;
-                        }
-                        if (root.empty()) {
-                            root = "./";
-                        }
-
-                        StaticHandler staticHandler(root);
-                        HttpResponse response = staticHandler.handle(request);
-                        conn.out_buffer = response.toString();
-                    }
-                    conn.modEpoll(epfd, true);
-                }
                 conn.modEpoll(epfd, conn.wantsWrite());
             }
 
@@ -867,5 +805,6 @@ void EventLoop::run(Config* config)
             }
         }
     }
+
     close(epfd);
 }

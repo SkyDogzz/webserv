@@ -21,15 +21,9 @@
 
 class LocationConfig {
 public:
-    LocationConfig()
-        : path("")
-        , root("")
-        , index("")
-        , autoindex(false)
-        , upload_dir("")
-        , redirect_code(0)
-        , redirect_url("")
-    {}
+    LocationConfig();
+
+    ~LocationConfig();
 
     std::string path;
 
@@ -47,8 +41,6 @@ public:
     std::map<std::string, std::string> cgi; // extension -> interpreter
     std::string upload_dir;
 
-    int         redirect_code;
-    std::string redirect_url;
     size_t client_max_body_size;
 };
 

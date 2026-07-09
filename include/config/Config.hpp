@@ -22,6 +22,7 @@
 class Config {
 public:
     Config(JsonValue *ObjConfig);
+    void validate() const;
 
     std::vector<ServerConfig> servers;
 };
