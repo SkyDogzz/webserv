@@ -1,5 +1,6 @@
 #include "../../include/network/Connection.hpp"
 #include "../../include/utils/Utils.hpp"
+#include <cerrno>
 #include <cstring>
 #include <sys/epoll.h>
 #include <sys/socket.h>
@@ -68,7 +69,9 @@ bool Connection::readFromSocket()
         std::cerr << "recv EOF on fd=" << fd << std::endl;
         return false;
     }
-    return true;
+    if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+        return true;
+    return false;
 }
 
 bool Connection::writeToSocket()
@@ -85,7 +88,9 @@ bool Connection::writeToSocket()
         std::cerr << "send returned 0 on fd=" << fd << std::endl;
         return false;
     }
-    return true;
+    if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+        return true;
+    return false;
 }
 
 void Connection::setKeepAlive(bool value) { keep_alive = value; }
@@ -145,7 +150,8 @@ bool Connection::modEpoll(int epfd, bool want_write) const
 {
     struct epoll_event ev;
     std::memset(&ev, 0, sizeof(ev));
-    ev.events = EPOLLIN | (want_write ? static_cast<uint32_t>(EPOLLOUT) : 0);
+    ev.events = (close_after_write ? 0U : static_cast<uint32_t>(EPOLLIN))
+        | (want_write ? static_cast<uint32_t>(EPOLLOUT) : 0U);
     ev.data.fd = fd;
     return epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) == 0;
 }

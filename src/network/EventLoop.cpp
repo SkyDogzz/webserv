@@ -500,8 +500,15 @@ static void expireTimedOutCgiJobs(int epfd, std::map<int, Connection>& conns, st
             expired.push_back(it->first);
     }
 
-    for (std::vector<int>::iterator it = expired.begin(); it != expired.end(); ++it)
+    for (std::vector<int>::iterator it = expired.begin(); it != expired.end(); ++it) {
+        DEBUG_LOG << "CGI timeout on connection fd=" << *it << std::endl;
         finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, *it, 504);
+        std::map<int, Connection>::iterator conn_it = conns.find(*it);
+        if (conn_it != conns.end()) {
+            DEBUG_LOG << "CGI timeout response bytes=" << conn_it->second.out_buffer.size() << std::endl;
+            conn_it->second.modEpoll(epfd, conn_it->second.wantsWrite());
+        }
+    }
 }
 
 static void reapCompletedCgiJobs(int epfd, std::map<int, Connection>& conns, std::map<int, CgiJobEntry>& cgi_jobs,
@@ -601,7 +608,8 @@ static void closeListeningSocket(
     listen_map.erase(it);
 }
 
-static void expireTimedOutConnections(int epfd, std::map<int, Connection>& conns)
+static void expireTimedOutConnections(
+    int epfd, std::map<int, Connection>& conns, const std::map<int, CgiJobEntry>& cgi_jobs)
 {
     const long header_timeout_ms = 15000;
     const long body_timeout_ms = 15000;
@@ -610,6 +618,8 @@ static void expireTimedOutConnections(int epfd, std::map<int, Connection>& conns
 
     std::vector<int> expired;
     for (std::map<int, Connection>::iterator it = conns.begin(); it != conns.end(); ++it) {
+        if (cgi_jobs.find(it->first) != cgi_jobs.end())
+            continue;
         if (it->second.isHeaderTimedOut(now_ms, header_timeout_ms)
             || it->second.isBodyTimedOut(now_ms, body_timeout_ms)
             || it->second.isIdleTimedOut(now_ms, idle_timeout_ms)) {
@@ -637,6 +647,7 @@ void EventLoop::run(const Config& config)
     }
 
     std::vector<ListeningSocket> listens;
+    listens.reserve(config.servers.size());
     std::map<int, size_t> listen_map;
     for (size_t i = 0; i < config.servers.size(); ++i) {
         const ServerConfig& server = config.servers[i];
@@ -651,7 +662,7 @@ void EventLoop::run(const Config& config)
         listens.push_back(sock);
         listen_map[listens.back().getFd()] = listens.size() - 1;
         DEBUG_LOG << "Listening socket ready on host=" << (server.host.empty() ? "*" : server.host)
-                  << " port=" << server.port << " fd=" << sock.getFd() << std::endl;
+                  << " port=" << server.port << " fd=" << listens.back().getFd() << std::endl;
     }
 
     if (listen_map.empty()) {
@@ -673,7 +684,7 @@ void EventLoop::run(const Config& config)
     std::map<int, int> cgi_fd_owner;
 
     while (WebServer::getInstance().isRunning()) {
-        expireTimedOutConnections(epfd, conns);
+        expireTimedOutConnections(epfd, conns, cgi_jobs);
         expireTimedOutCgiJobs(epfd, conns, cgi_jobs, cgi_fd_owner);
         reapCompletedCgiJobs(epfd, conns, cgi_jobs, cgi_fd_owner, config, listens, listen_map);
 
@@ -774,25 +785,36 @@ void EventLoop::run(const Config& config)
                 continue;
             Connection& conn = conn_it->second;
 
-            if (events[i].events & (EPOLLHUP | EPOLLERR)) {
+            if (events[i].events & EPOLLERR) {
                 closeConnection(epfd, conns, fd);
                 continue;
+            }
+            if ((events[i].events & EPOLLHUP) && conn.out_buffer.empty() && cgi_jobs.find(fd) == cgi_jobs.end()) {
+                closeConnection(epfd, conns, fd);
+                continue;
+            }
+            if (events[i].events & EPOLLHUP) {
+                conn.setKeepAlive(false);
+                conn.markCloseAfterWrite();
             }
 
             if (events[i].events & EPOLLIN) {
                 bool was_empty = conn.in_buffer.empty();
-                bool peer_closed = false;
-                if (!conn.readFromSocket())
-                    peer_closed = true;
-                if (peer_closed && conn.in_buffer.empty()) {
-                    closeConnection(epfd, conns, fd);
+                if (!conn.readFromSocket()) {
+                    conn.setKeepAlive(false);
+                    conn.markCloseAfterWrite();
+                    if (conn.in_buffer.empty() && conn.out_buffer.empty() && cgi_jobs.find(fd) == cgi_jobs.end()) {
+                        closeConnection(epfd, conns, fd);
+                    } else {
+                        if (!conn.in_buffer.empty())
+                            processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
+                        conn.modEpoll(epfd, conn.wantsWrite());
+                    }
                     continue;
                 }
                 if (was_empty)
                     conn.markRequestStart();
                 conn.markActivity();
-                if (peer_closed)
-                    conn.markCloseAfterWrite();
                 processBufferedRequests(epfd, config, listens, listen_map, cgi_jobs, cgi_fd_owner, conn);
                 conn.modEpoll(epfd, conn.wantsWrite());
             }

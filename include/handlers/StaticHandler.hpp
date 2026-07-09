@@ -20,12 +20,12 @@ private:
     static std::string buildRedirectLocation(const std::string& target);
     static std::string buildAutoindexBody(const std::string& dir_path, const std::string& uri);
     static std::string htmlEscapeCopy(const std::string& value);
-    static std::string buildUploadLocation(const std::string& request_path, const std::string& filename);
     HttpResponse makeErrorResponse(int status_code) const;
     HttpResponse handleGetOrHead(const HttpRequest& request) const;
     HttpResponse handlePost(const HttpRequest& request) const;
     HttpResponse handleDelete(const HttpRequest& request) const;
     static std::string makeUploadFilename(const std::string& hint);
+    static std::string sanitizeUploadFilename(const std::string& filename);
 };
 
 #endif

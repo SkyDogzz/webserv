@@ -6,8 +6,10 @@
 #include <cstdio>
 #include <ctime>
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <dirent.h>
+#include <map>
 #include <vector>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -19,6 +21,170 @@
 StaticHandler::StaticHandler(const RequestContext& context)
     : context_(context)
 {
+}
+
+struct MultipartFile {
+    std::string filename;
+    std::string content;
+    bool found;
+
+    MultipartFile()
+        : found(false)
+    {
+    }
+};
+
+static std::string stripLineEndCopy(const std::string& line)
+{
+    if (!line.empty() && line[line.size() - 1] == '\r')
+        return line.substr(0, line.size() - 1);
+    return line;
+}
+
+static std::string unquoteCopy(const std::string& value)
+{
+    std::string trimmed = Utils::trimCopy(value);
+    if (trimmed.size() >= 2 && trimmed[0] == '"' && trimmed[trimmed.size() - 1] == '"') {
+        std::string out;
+        for (std::string::size_type i = 1; i + 1 < trimmed.size(); ++i) {
+            if (trimmed[i] == '\\' && i + 2 < trimmed.size()) {
+                ++i;
+                out.push_back(trimmed[i]);
+            } else {
+                out.push_back(trimmed[i]);
+            }
+        }
+        return out;
+    }
+    return trimmed;
+}
+
+static bool extractMultipartBoundary(const std::string& content_type, std::string& boundary)
+{
+    boundary.clear();
+    std::string::size_type pos = 0;
+    bool multipart = false;
+    while (pos <= content_type.size()) {
+        std::string::size_type semi = content_type.find(';', pos);
+        std::string part = Utils::trimCopy(content_type.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos));
+        std::string lower = Utils::toLowerCopy(part);
+        if (pos == 0 && lower == "multipart/form-data")
+            multipart = true;
+        std::string::size_type eq = part.find('=');
+        if (eq != std::string::npos) {
+            std::string key = Utils::toLowerCopy(Utils::trimCopy(part.substr(0, eq)));
+            if (key == "boundary")
+                boundary = unquoteCopy(part.substr(eq + 1));
+        }
+        if (semi == std::string::npos)
+            break;
+        pos = semi + 1;
+    }
+    return multipart && !boundary.empty();
+}
+
+static std::map<std::string, std::string> parseMultipartHeaders(const std::string& block)
+{
+    std::map<std::string, std::string> headers;
+    std::string::size_type start = 0;
+    while (start <= block.size()) {
+        std::string::size_type end = block.find('\n', start);
+        std::string line = stripLineEndCopy(block.substr(start, end == std::string::npos ? std::string::npos : end - start));
+        std::string::size_type colon = line.find(':');
+        if (colon != std::string::npos) {
+            std::string key = Utils::toLowerCopy(Utils::trimCopy(line.substr(0, colon)));
+            std::string value = Utils::trimCopy(line.substr(colon + 1));
+            if (!key.empty())
+                headers[key] = value;
+        }
+        if (end == std::string::npos)
+            break;
+        start = end + 1;
+    }
+    return headers;
+}
+
+static std::string extractDispositionParam(const std::string& disposition, const std::string& param)
+{
+    std::string::size_type pos = 0;
+    while (pos <= disposition.size()) {
+        std::string::size_type semi = disposition.find(';', pos);
+        std::string part = Utils::trimCopy(disposition.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos));
+        std::string::size_type eq = part.find('=');
+        if (eq != std::string::npos) {
+            std::string key = Utils::toLowerCopy(Utils::trimCopy(part.substr(0, eq)));
+            if (key == param)
+                return unquoteCopy(part.substr(eq + 1));
+        }
+        if (semi == std::string::npos)
+            break;
+        pos = semi + 1;
+    }
+    return "";
+}
+
+static std::string::size_type findHeaderEnd(const std::string& body, std::string::size_type start, std::size_t& sep_len)
+{
+    std::string::size_type crlf = body.find("\r\n\r\n", start);
+    std::string::size_type lf = body.find("\n\n", start);
+    if (crlf == std::string::npos || (lf != std::string::npos && lf < crlf)) {
+        sep_len = 2;
+        return lf;
+    }
+    sep_len = 4;
+    return crlf;
+}
+
+static bool parseMultipartFile(const std::string& body, const std::string& boundary, MultipartFile& file,
+    std::size_t& part_count)
+{
+    const std::string delimiter = "--" + boundary;
+    std::string::size_type pos = body.find(delimiter);
+    part_count = 0;
+    file = MultipartFile();
+    if (pos == std::string::npos)
+        return false;
+    pos += delimiter.size();
+
+    while (pos < body.size()) {
+        if (body.compare(pos, 2, "--") == 0)
+            return true;
+        if (body.compare(pos, 2, "\r\n") == 0)
+            pos += 2;
+        else if (body.compare(pos, 1, "\n") == 0)
+            pos += 1;
+        else
+            return false;
+
+        std::size_t sep_len = 0;
+        std::string::size_type header_end = findHeaderEnd(body, pos, sep_len);
+        if (header_end == std::string::npos)
+            return false;
+        std::map<std::string, std::string> headers = parseMultipartHeaders(body.substr(pos, header_end - pos));
+        std::string::size_type data_start = header_end + sep_len;
+        std::string::size_type next = body.find(delimiter, data_start);
+        if (next == std::string::npos)
+            return false;
+
+        std::string::size_type data_end = next;
+        if (data_end >= 2 && body.compare(data_end - 2, 2, "\r\n") == 0)
+            data_end -= 2;
+        else if (data_end >= 1 && body.compare(data_end - 1, 1, "\n") == 0)
+            data_end -= 1;
+
+        ++part_count;
+        std::map<std::string, std::string>::const_iterator disp = headers.find("content-disposition");
+        if (!file.found && disp != headers.end()) {
+            std::string filename = extractDispositionParam(disp->second, "filename");
+            if (!filename.empty()) {
+                file.filename = filename;
+                file.content = body.substr(data_start, data_end - data_start);
+                file.found = true;
+            }
+        }
+        pos = next + delimiter.size();
+    }
+    return true;
 }
 
 std::string StaticHandler::buildFilesystemPath(const std::string& uri) const
@@ -114,11 +280,6 @@ std::string StaticHandler::buildAutoindexBody(const std::string& dir_path, const
     return out.str();
 }
 
-std::string StaticHandler::buildUploadLocation(const std::string& request_path, const std::string& filename)
-{
-    return Utils::joinPathCopy(Utils::stripQueryCopy(request_path), filename);
-}
-
 HttpResponse StaticHandler::makeErrorResponse(int status_code) const
 {
     HttpResponse response = HttpResponse::makeError(status_code, false);
@@ -168,6 +329,27 @@ std::string StaticHandler::makeUploadFilename(const std::string& hint)
             out << ext;
     }
     return out.str();
+}
+
+std::string StaticHandler::sanitizeUploadFilename(const std::string& filename)
+{
+    std::string clean = filename;
+    std::string::size_type slash = clean.find_last_of("/\\");
+    if (slash != std::string::npos)
+        clean = clean.substr(slash + 1);
+
+    std::string out;
+    for (std::string::size_type i = 0; i < clean.size(); ++i) {
+        unsigned char c = static_cast<unsigned char>(clean[i]);
+        if (std::isalnum(c) || clean[i] == '.' || clean[i] == '_' || clean[i] == '-')
+            out.push_back(clean[i]);
+        else
+            out.push_back('_');
+    }
+
+    if (out.empty() || out == "." || out == ".." || Utils::hasPathTraversal(out))
+        return makeUploadFilename(filename);
+    return out;
 }
 
 std::string StaticHandler::guessMimeType(const std::string& path)
@@ -316,14 +498,46 @@ HttpResponse StaticHandler::handlePost(const HttpRequest& request) const
     if (Utils::hasPathTraversal(request.path))
         return makeErrorResponse(403);
 
+    DEBUG_LOG << "upload request method=" << request.method << " uri=" << request.target << std::endl;
+    std::map<std::string, std::string>::const_iterator ct = request.headers.find("content-type");
+    std::map<std::string, std::string>::const_iterator cl = request.headers.find("content-length");
+    DEBUG_LOG << "upload content-type=" << (ct == request.headers.end() ? "" : ct->second) << std::endl;
+    DEBUG_LOG << "upload content-length=" << (cl == request.headers.end() ? "" : cl->second)
+              << " body-size=" << request.body.size() << std::endl;
+
     struct stat st;
     if (stat(context_.upload_dir.c_str(), &st) != 0)
         return makeErrorResponse(403);
     if (!S_ISDIR(st.st_mode))
         return makeErrorResponse(403);
 
-    std::string filename = makeUploadFilename(request.path);
+    std::string filename;
+    std::string content;
+    std::string boundary;
+    std::size_t part_count = 0;
+    bool is_multipart = ct != request.headers.end()
+        && Utils::toLowerCopy(Utils::trimCopy(ct->second)).compare(0, 19, "multipart/form-data") == 0;
+    if (is_multipart && !extractMultipartBoundary(ct->second, boundary))
+        return makeErrorResponse(400);
+    if (is_multipart) {
+        MultipartFile multipart_file;
+        if (!parseMultipartFile(request.body, boundary, multipart_file, part_count))
+            return makeErrorResponse(400);
+        if (!multipart_file.found)
+            return makeErrorResponse(400);
+        filename = sanitizeUploadFilename(multipart_file.filename);
+        content = multipart_file.content;
+    } else {
+        filename = makeUploadFilename(request.path);
+        content = request.body;
+    }
+
     std::string full_path = Utils::joinPathCopy(context_.upload_dir, filename);
+    DEBUG_LOG << "upload boundary=" << boundary << std::endl;
+    DEBUG_LOG << "upload multipart-parts=" << part_count << std::endl;
+    DEBUG_LOG << "upload filename=" << filename << std::endl;
+    DEBUG_LOG << "upload write-path=" << full_path << std::endl;
+
     std::ofstream file(full_path.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
     if (!file) {
         if (errno == EACCES || errno == EPERM)
@@ -331,12 +545,15 @@ HttpResponse StaticHandler::handlePost(const HttpRequest& request) const
         return HttpResponse::makeError(500, false);
     }
 
-    file.write(request.body.c_str(), request.body.size());
+    file.write(content.c_str(), content.size());
     if (!file.good())
         return HttpResponse::makeError(500, false);
 
-    HttpResponse response = HttpResponse::makeText(201, "<html><body><h1>Created</h1></body></html>", "text/html", false);
-    response.headers["Location"] = buildUploadLocation(request.path, filename);
+    std::ostringstream body;
+    body << "<html><body><h1>Upload created</h1><p>Saved "
+         << htmlEscapeCopy(filename) << " (" << content.size() << " bytes)</p></body></html>";
+    HttpResponse response = HttpResponse::makeText(201, body.str(), "text/html", false);
+    DEBUG_LOG << "upload response status=201 content-type=text/html content-length=" << body.str().size() << std::endl;
     return response;
 }
 
@@ -345,7 +562,16 @@ HttpResponse StaticHandler::handleDelete(const HttpRequest& request) const
     if (Utils::hasPathTraversal(request.path))
         return makeErrorResponse(403);
 
-    std::string file_path = buildFilesystemPath(request.path);
+    std::string file_path;
+    if (!context_.upload_dir.empty() && context_.location != NULL
+        && request.path.compare(0, context_.location->path.size(), context_.location->path) == 0) {
+        std::string relative = request.path.substr(context_.location->path.size());
+        if (relative.empty())
+            relative = "/";
+        file_path = Utils::joinPathCopy(context_.upload_dir, relative);
+    } else {
+        file_path = buildFilesystemPath(request.path);
+    }
     struct stat st;
     if (stat(file_path.c_str(), &st) != 0)
         return makeErrorResponse(404);

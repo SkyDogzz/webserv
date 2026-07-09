@@ -15,7 +15,7 @@ int main(int argc, const char* argv[])
         return EXIT_FAILURE;
     }
 
-    DebugLogger::setEnabled(false);
+    DebugLogger::setEnabled(std::getenv("WEBSERV_DEBUG") != NULL);
 
     try {
         Lexer lexer(argv[1]);
