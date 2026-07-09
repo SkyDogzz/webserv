@@ -1,0 +1,14 @@
+{
+  "name": "webserv",
+  "category": "static-json",
+  "checks": [
+    "mime",
+    "content-length",
+    "range",
+    "keep-alive"
+  ],
+  "nested": {
+    "method": "GET",
+    "path": "/tests/data.json"
+  }
+}

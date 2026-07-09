@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>webserv test hub</title>
+    <link rel="stylesheet" href="/tests/style.css" />
+    <script defer src="/tests/data.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">webserv</p>
+        <h1>Test hub</h1>
+        <p class="lede">
+          Static files, JSON, scripts, CGI, upload fixtures and error pages are
+          grouped here to stress the server from multiple angles.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article>
+          <h2>Static content</h2>
+          <ul>
+            <li><a href="/tests/plain.txt">Plain text</a></li>
+            <li><a href="/tests/data.json">JSON document</a></li>
+            <li><a href="/tests/style.css">Stylesheet</a></li>
+            <li><a href="/tests/data.js">JavaScript</a></li>
+          </ul>
+        </article>
+
+        <article>
+          <h2>CGI checks</h2>
+          <ul>
+            <li><a href="/cgi-bin/echo.py">Echo CGI</a></li>
+            <li><a href="/cgi-bin/headers.py">Header dump</a></li>
+            <li><a href="/cgi-bin/status.py?code=201">Custom status CGI</a></li>
+            <li><a href="/cgi-bin/multipart_echo.py">Multipart echo</a></li>
+          </ul>
+        </article>
+
+        <article>
+          <h2>Error pages</h2>
+          <ul>
+            <li><a href="/errors/400.html">400</a></li>
+            <li><a href="/errors/403.html">403</a></li>
+            <li><a href="/errors/404.html">404</a></li>
+            <li><a href="/errors/405.html">405</a></li>
+            <li><a href="/errors/413.html">413</a></li>
+            <li><a href="/errors/500.html">500</a></li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Interactive forms</h2>
+        <form action="/cgi-bin/echo.py" method="get">
+          <label>
+            Query string
+            <input name="query" value="hello from GET" />
+          </label>
+          <button type="submit">Send GET</button>
+        </form>
+
+        <form action="/cgi-bin/echo.py" method="post">
+          <label>
+            Plain text body
+            <textarea name="body" rows="4">hello from POST</textarea>
+          </label>
+          <button type="submit">Send POST</button>
+        </form>
+
+        <form action="/cgi-bin/multipart_echo.py" method="post" enctype="multipart/form-data">
+          <label>
+            Upload sample
+            <input type="file" name="upload" />
+          </label>
+          <button type="submit">Send multipart</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

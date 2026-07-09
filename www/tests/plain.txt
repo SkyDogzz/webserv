@@ -1,0 +1,3 @@
+webserv static fixture
+GET/HEAD response body smoke test
+Add a range of files around it to validate directory and MIME handling.
