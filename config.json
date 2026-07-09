@@ -15,7 +15,7 @@
 				},
 				"/tests": {
 					"methods": ["GET"],
-					"root": "./www/tests",
+					"root": "./www",
 					"index": "index.html",
 					"autoindex": false
 				},
