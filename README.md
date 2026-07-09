@@ -1,10 +1,13 @@
-*This project has been created as part of the 42 curriculum by leothoma and tstephan.*
+_This project has been created as part of the 42 curriculum by leothoma and tstephan._
 
 # webserv
 
-`webserv` is a small HTTP server written in C++98 for the 42 curriculum. It parses a JSON configuration file, opens listening sockets, routes requests by host and path, serves static files, and supports common HTTP behaviors such as error pages, uploads, and CGI execution.
+## Description
 
-## Overview
+`webserv` is a C++98 HTTP server built for the 42 curriculum.
+Its goal is to accept client connections, parse HTTP requests, route them according to the loaded configuration, and generate the correct HTTP responses for static files, errors, uploads, and CGI execution.
+
+## Schemas
 
 ```mermaid
 flowchart TD
@@ -40,23 +43,6 @@ flowchart TD
     AA -- "no" --> AB["Close connection"]
 ```
 
-## Description
-
-The project focuses on building a non-blocking web server from scratch.
-
-Main features:
-
-- HTTP/1.1 request parsing.
-- Configurable virtual servers and locations.
-- Static file serving.
-- Custom error pages.
-- Directory indexes and autoindex support.
-- File upload handling.
-- CGI execution for configured routes.
-- Non-blocking I/O with `epoll`.
-
-## Configuration Flow
-
 ```mermaid
 flowchart TD
     A["main.cpp"] --> B["Config object"]
@@ -69,8 +55,6 @@ flowchart TD
     H --> I["LocationConfig"]
     I --> J["root / index / methods / redirects"]
 ```
-
-## Routing Flow
 
 ```mermaid
 flowchart TD
@@ -89,8 +73,6 @@ flowchart TD
     J --> K["StaticHandler"]
 ```
 
-## Error Handling
-
 ```mermaid
 flowchart TD
     A["Incoming request"] --> B{"Request frame valid?"}
@@ -108,7 +90,23 @@ flowchart TD
     L -- "yes" --> N["Response sent"]
 ```
 
+The project covers the main pieces of a web server:
+
+- configuration parsing;
+- virtual hosts and route selection;
+- non-blocking socket I/O;
+- HTTP request parsing and response serialization;
+- static file serving;
+- CGI execution for configured routes;
+- upload handling and custom error pages.
+
 ## Instructions
+
+### Prerequisites
+
+- `make`
+- `g++` with C++98 support
+- a Linux environment, since the project uses `epoll`
 
 ### Compilation
 
@@ -116,48 +114,72 @@ flowchart TD
 make
 ```
 
+Useful targets:
+
+```bash
+make clean
+make fclean
+make re
+make cppcheck
+make format
+```
+
 ### Execution
+
+Run the server with a configuration file:
 
 ```bash
 ./webserv config.json
 ```
 
-If no configuration file is provided, the program should use its default configuration behavior, if implemented.
+The provided [`config.json`](./config.json) starts a server on port `8111` and uses the demo content in:
 
-### Example configuration
+- [`www/`](./www)
+- [`errors/`](./errors)
+- [`cgi-bin/`](./cgi-bin)
+- [`www/uploads/`](./www/uploads)
 
-The repository includes [`config.json`](./config.json) as a working example. It defines:
+You can enable debug logs with:
 
-- a server listening on port `8080`;
-- a static root at `./www`;
-- a custom `404` page at `/errors/404.html`;
-- a CGI-enabled `/cgi-bin` location.
+```bash
+WEBSERV_DEBUG=1 ./webserv config.json
+```
+
+## Features
+
+- HTTP/1.0 and HTTP/1.1 request handling.
+- Configurable server blocks and locations.
+- Static file serving with index support.
+- Custom error pages.
+- CGI execution for configured extensions or routes.
+- Upload support for configured directories.
+- Non-blocking event-driven I/O.
 
 ## Resources
 
-- RFC 9110 and RFC 9112 for HTTP semantics and HTTP/1.1.
-- `man` pages for system calls used by the project, especially `epoll`, `socket`, `bind`, `listen`, `accept`, `read`, `write`, `poll`, `fcntl`, and `fork`.
-- CGI documentation for request environment variables and standard input/output handling.
-- The project code and comments for implementation details.
+Classic references used for this project:
 
-## AI Usage
+- [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110)
+- [RFC 9112: HTTP/1.1](https://www.rfc-editor.org/rfc/rfc9112)
+- [RFC 3875: CGI - Common Gateway Interface](https://www.rfc-editor.org/rfc/rfc3875)
+- `man 2 epoll_create`, `man 2 epoll_ctl`, `man 2 epoll_wait`
+- `man 2 socket`, `man 2 bind`, `man 2 listen`, `man 2 accept`
+- `man 2 read`, `man 2 write`, `man 2 fcntl`, `man 2 fork`, `man 2 execve`
+- JSON syntax reference: [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259)
 
-AI tools were used to help with documentation, code organization, and review of implementation choices. Any generated content should still be validated against the project requirements and the actual behavior of the codebase.
+AI usage:
 
-## Repository Layout
+- AI was used to rewrite and structure this README so it matches the 42 rubric.
+- AI helped cross-check the documented build and run commands against [`Makefile`](./Makefile) and [`src/main.cpp`](./src/main.cpp).
+- AI helped summarize the implementation areas from the repository layout and configuration files.
+- AI was not used as an authoritative source for the server implementation; the codebase remains the source of truth.
 
-- `src/`: source code.
-- `include/`: headers.
-- `jsons/`: JSON fixtures used by the configuration parser.
-- `tests/fixtures/cgi/`: CGI fixture scripts.
-- `www/`: static demo site.
-- `errors/`: custom error pages.
-- `www/uploads/`: upload target directory.
+## Project Layout
 
-## Demo Assets
-
-The repository ships with minimal demo assets so the default configuration has a valid static root and error page:
-
-- `www/index.html`
-- `errors/404.html`
-- `www/uploads/.gitkeep`
+- [`src/`](./src): implementation of the server.
+- [`include/`](./include): public headers.
+- [`config.json`](./config.json): sample configuration.
+- [`www/`](./www): demo static content.
+- [`errors/`](./errors): custom error pages.
+- [`cgi-bin/`](./cgi-bin): CGI scripts used by the demo config.
+- [`tests/`](./tests): parser, request, CGI, and upload fixtures.
