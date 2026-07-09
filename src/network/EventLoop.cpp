@@ -322,13 +322,14 @@ static bool startCgiForRequest(int epfd, std::map<int, int>& cgi_fd_owner, std::
     int conn_fd, const HttpRequest& request, const RequestContext& context, const std::string& script_path,
     const std::string& interpreter_path)
 {
-    CgiJobEntry entry;
-    if (!entry.process.start(request, context, script_path, interpreter_path))
+    CgiJobEntry& entry = cgi_jobs[conn_fd];
+    if (!entry.process.start(request, context, script_path, interpreter_path)) {
+        cgi_jobs.erase(conn_fd);
         return false;
+    }
 
     addCgiFd(epfd, cgi_fd_owner, conn_fd, entry.process.getReadFd(), EPOLLIN);
     addCgiFd(epfd, cgi_fd_owner, conn_fd, entry.process.getWriteFd(), EPOLLOUT);
-    cgi_jobs[conn_fd] = entry;
     return true;
 }
 
