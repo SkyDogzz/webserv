@@ -24,10 +24,12 @@ public:
     bool open(const std::string& host, const std::string& port, int backlog);
     int acceptClient() const;
     bool addToEpoll(int epfd) const;
+    void closeSocket();
 
     int getFd() const;
-    std::string getHost() const;
-    std::string getPort() const;
+    const std::string& getHost() const;
+    const std::string& getPort() const;
+    bool isOpen() const;
 
 private:
     int fd;

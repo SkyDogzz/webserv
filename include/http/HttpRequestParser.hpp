@@ -21,7 +21,7 @@ public:
     static bool parse(const std::string& buffer, HttpRequest& request);
 
     class FirstLineInvalidException : public std::exception {
-        const char* what() const throw() { return "First line invalid exception"; }
+        virtual const char* what() const throw() { return "First line invalid exception"; }
     };
 };
 

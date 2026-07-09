@@ -13,6 +13,7 @@ WebServer::WebServer()
     : _running(true), _config(NULL)
 {
     signal(SIGINT, &WebServer::sigintHandler);
+    signal(SIGPIPE, SIG_IGN);
 }
 
 WebServer::~WebServer() {
@@ -27,10 +28,21 @@ WebServer& WebServer::getInstance()
     return _instance;
 }
 
-void WebServer::appliConfig(Config& config) {
-	(void)config;
+void WebServer::appliConfig(Config& config)
+{
+    config.validate();
+    _config = &config;
 }
 
-void WebServer::run() { _event_loop.run(_config); }
+const Config* WebServer::getConfig() const { return _config; }
 
-bool WebServer::isRunning() { return _running; }
+void WebServer::run()
+{
+    if (_config == NULL) {
+        std::cerr << "No configuration loaded" << std::endl;
+        return;
+    }
+    _event_loop.run(*_config);
+}
+
+bool WebServer::isRunning() const { return _running; }

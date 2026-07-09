@@ -1,20 +1,20 @@
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 
 #include "../include/config/Config.hpp"
-#include "../src/config/lexer.hpp"
 #include "../include/core/WebServer.hpp"
-#include "../src/config/parser.hpp"
-#include "../src/config/JsonValue.hpp"
+#include "../include/utils/DebugLogger.hpp"
 
-int main(int argc, char* argv[])
+int main(int argc, const char* argv[])
 {
-	if (argc != 2) {
-		std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;
-		return EXIT_FAILURE;
-	}
-	Lexer lexer(argv[1]);
-	Parser parser(lexer);
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " config_file" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    bool debug_logs = false;
+    DebugLogger::setEnabled(debug_logs);
 
 	std::cout << "--- Starting Parsing ---" << std::endl;
 	JsonValue* root = parser.parse();
@@ -43,8 +43,18 @@ int main(int argc, char* argv[])
 		std::cerr << "Unknown exception throwed: " << e.what() << std::endl;
 		return EXIT_FAILURE;
 	}
+    try {
+        std::string filename(argv[1]);
+        Config config = Config(filename);
 
-    (void)argc;
-    (void)argv;
+        WebServer& webServer = WebServer::getInstance();
+        webServer.appliConfig(config);
+
+        webServer.run();
+    } catch (std::exception& e) {
+        std::cerr << "Unknown exception throwed: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }

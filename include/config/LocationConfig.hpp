@@ -1,9 +1,9 @@
 #ifndef LOCATIONCONFIG_HPP
 #define LOCATIONCONFIG_HPP
 
-#include <string>
-#include <set>
 #include <map>
+#include <set>
+#include <string>
 
 /*
     LocationConfig
@@ -40,11 +40,16 @@ public:
 
     bool autoindex;
 
+    int redirect_code;
+    std::string redirect_url;
+
+    std::map<int, std::string> error_pages;
     std::map<std::string, std::string> cgi; // extension -> interpreter
     std::string upload_dir;
 
     int         redirect_code;
     std::string redirect_url;
+    size_t client_max_body_size;
 };
 
 #endif

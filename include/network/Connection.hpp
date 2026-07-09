@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <string>
+#include <sys/time.h>
 
 /*
     Connection
@@ -21,10 +22,10 @@
 class Connection {
 public:
     Connection();
-    Connection(int fd, int listen_fd);
+    Connection(int client_fd, int listen_fd_arg);
     ~Connection();
 
-    void init(int fd, int listen_fd);
+    void init(int client_fd, int listen_fd_arg);
     int getFd() const;
     int getListenFd() const;
 
@@ -34,7 +35,16 @@ public:
     void setKeepAlive(bool value);
     void markCloseAfterWrite();
     bool wantsWrite() const;
+    bool keepAlive() const;
+    bool closeAfterWriteRequested() const;
     bool shouldCloseAfterWrite() const;
+    void markActivity();
+    void markRequestStart();
+    bool isHeaderTimedOut(long now_ms, long timeout_ms) const;
+    bool isBodyTimedOut(long now_ms, long timeout_ms) const;
+    bool isIdleTimedOut(long now_ms, long timeout_ms) const;
+    long getLastActivityMs() const;
+    long getRequestStartMs() const;
 
     bool addToEpoll(int epfd) const;
     bool modEpoll(int epfd, bool want_write) const;
@@ -47,6 +57,8 @@ private:
     int listen_fd;
     bool keep_alive;
     bool close_after_write;
+    long last_activity_ms;
+    long request_start_ms;
 };
 
 #endif

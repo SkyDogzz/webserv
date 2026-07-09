@@ -27,6 +27,9 @@ public:
 	JsonValue(bool b);
 	JsonValue(double n);
 	JsonValue(const std::string &s);
+	explicit JsonValue(bool b);
+	explicit JsonValue(double n);
+	explicit JsonValue(const std::string &s);
 	JsonValue(const JsonValue &src);
 	JsonValue& operator=(const JsonValue &rhs);
 	~JsonValue();

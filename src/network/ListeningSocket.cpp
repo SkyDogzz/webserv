@@ -1,22 +1,13 @@
 #include "../../include/network/ListeningSocket.hpp"
+#include "../../include/utils/DebugLogger.hpp"
+#include "../../include/utils/Utils.hpp"
 #include <cerrno>
 #include <cstring>
-#include <fcntl.h>
 #include <iostream>
 #include <netdb.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-static bool makeNonBlocking(int fd)
-{
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1)
-        return false;
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-        return false;
-    return true;
-}
 
 ListeningSocket::ListeningSocket()
     : fd(-1)
@@ -56,8 +47,7 @@ ListeningSocket& ListeningSocket::operator=(const ListeningSocket& other)
 
 ListeningSocket::~ListeningSocket()
 {
-    if (fd != -1)
-        close(fd);
+    closeSocket();
 }
 
 bool ListeningSocket::open(const std::string& host, const std::string& port, int backlog)
@@ -104,9 +94,9 @@ bool ListeningSocket::open(const std::string& host, const std::string& port, int
                 close(socket_fd);
                 continue;
             }
-            makeNonBlocking(socket_fd);
+            Utils::makeNonBlocking(socket_fd);
             fd = socket_fd;
-            std::cout << "Listening on " << (gni == 0 ? hostbuf : "*") << ":" << (gni == 0 ? servbuf : port)
+            DEBUG_LOG << "Listening on " << (gni == 0 ? hostbuf : "*") << ":" << (gni == 0 ? servbuf : port)
                       << " fd=" << fd << std::endl;
             break;
         }
@@ -127,7 +117,7 @@ int ListeningSocket::acceptClient() const
         return -1;
     if (client_fd == -1)
         return -1;
-    makeNonBlocking(client_fd);
+    Utils::makeNonBlocking(client_fd);
     return client_fd;
 }
 
@@ -140,8 +130,16 @@ bool ListeningSocket::addToEpoll(int epfd) const
     return epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == 0;
 }
 
+void ListeningSocket::closeSocket()
+{
+    Utils::closeFdSafe(fd);
+    fd = -1;
+}
+
 int ListeningSocket::getFd() const { return fd; }
 
-std::string ListeningSocket::getHost() const { return host_; }
+const std::string& ListeningSocket::getHost() const { return host_; }
 
-std::string ListeningSocket::getPort() const { return port_; }
+const std::string& ListeningSocket::getPort() const { return port_; }
+
+bool ListeningSocket::isOpen() const { return fd != -1; }

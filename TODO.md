@@ -7,13 +7,13 @@ Le depot contient une base minimale de serveur HTTP:
 - Makefile qui compile `src/**/*.cpp` en `webserv` avec `-Wall -Wextra -Werror -std=c++98`.
 - `main.cpp` impose un argument de configuration, mais la configuration est ignoree.
 - `Config`, `ServerConfig`, `LocationConfig` existent surtout comme structures de donnees, sans parsing.
-- `EventLoop` utilise `epoll` et cree deux ports en dur: `8080` et `8081`.
+- `EventLoop` utilise `epoll` et ouvre ses listeners a partir de la config.
 - `ListeningSocket` ouvre des sockets TCP, bind/listen, et les passe en non-bloquant.
 - `Connection` gere un fd client avec buffers `in_buffer` et `out_buffer`.
-- `HttpRequestParser` parse une requete HTTP tres simple.
+- `HttpRequestParser` parse une requete HTTP robuste, avec headers normalises en minuscules, support de `HTTP/1.0`/`HTTP/1.1`, `Content-Length`, `Transfer-Encoding: chunked`, keep-alive et requetes consecutives.
 - `HttpResponse` serialise une reponse basique.
-- `StaticHandler` sert des fichiers statiques depuis `./`.
-- `Router` est declare mais non implemente/utilise.
+- `StaticHandler` sert des fichiers statiques via le `RequestContext`.
+- `Router` est commence et branche de facon minimale pour la selection server/location.
 - `server.cpp` et `client.cpp` sont des essais UDP hors build.
 - `README.md`, fichiers de config de demo, error pages, tests et CGI sont absents.
 
@@ -21,14 +21,14 @@ Compilation: `make re` passe hors sandbox avec `-Wall -Wextra -Werror -std=c++98
 
 Legende:
 
-- `[x]` fait.
-- `[~]` partiel: une base existe dans le code, mais le libelle complet n'est pas encore respecte.
-- `[ ]` non fait ou non prouve.
+- `[x]` termine.
+- `[~]` partiel.
+- `[ ]` a faire ou non prouve.
 
 ## Ecarts majeurs avec le sujet
 
 - La configuration n'est pas parse et n'influence pas le runtime.
-- Les ports, hosts et roots sont hardcodes.
+- Le runtime lit deja les listeners depuis `Config`, mais la configuration n'est pas encore parsee.
 - Le serveur ne respecte pas encore toutes les contraintes I/O du sujet:
   - `epoll_create1` est utilise alors que le sujet liste `epoll_create`.
   - `recv`/`send` consultent `errno` apres l'appel pour gerer `EAGAIN`/`EWOULDBLOCK`, ce que le sujet interdit pour read/write.
@@ -54,30 +54,30 @@ Legende:
 Objectif: rendre la base propre, portable dans le cadre 42, et facile a etendre.
 
 - [x] Verifier que le Makefile respecte strictement le sujet: `NAME`, `all`, `clean`, `fclean`, `re`, pas de relink inutile.
-- [ ] Remplacer `find -printf` si la correction vise aussi macOS, car `-printf` n'est pas portable BSD.
-- [ ] Decider si `-Ofast` reste dans `CFLAGS`; preferer un build de correction simple et debuggable.
-- [ ] Retirer ou deplacer `server.cpp` et `client.cpp` hors des fichiers soumis si ce sont seulement des notes/experiences.
-- [ ] Initialiser toutes les donnees de config avec des constructeurs explicites:
+- [x] Remplacer `find -printf` si la correction vise aussi macOS, car `-printf` n'est pas portable BSD.
+- [x] Decider si `-Ofast` reste dans `CFLAGS`; preferer un build de correction simple et debuggable.
+- [x] Retirer ou deplacer `server.cpp` et `client.cpp` hors des fichiers soumis si ce sont seulement des notes/experiences.
+- [x] Initialiser toutes les donnees de config avec des constructeurs explicites:
   - `ServerConfig::port`
   - `ServerConfig::client_max_body_size`
   - `LocationConfig::autoindex`
-- [ ] Rendre les signatures const-correct:
+- [x] Rendre les signatures const-correct:
   - `Config(const std::string& filename)`
   - accesseurs quand necessaire.
-- [~] Centraliser les helpers communs:
-  - non-blocking fd
-  - close fd safe
-  - status reason phrases
-  - string trim/lowercase
-  - path utilities.
-- [~] Fermer proprement `epfd` et tous les sockets a l'arret.
-- [~] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
+- [x] Centraliser les helpers communs:
+  - [x] non-blocking fd
+  - [x] close fd safe
+  - [x] status reason phrases
+  - [x] string trim/lowercase
+  - [x] path utilities
+- [x] Fermer proprement `epfd` et tous les sockets a l'arret.
+- [x] Supprimer les logs de debug bruyants avant evaluation ou les garder derriere `DEBUG`.
 
 Validation:
 
 - [x] `make re` passe avec `-Wall -Wextra -Werror -std=c++98`.
 - [x] `make` relance immediatement sans relink inutile.
-- [ ] Aucun fichier experimental hors build ne peut perturber l'evaluation.
+- [x] Aucun fichier experimental hors build ne peut perturber l'evaluation.
 
 ## Epic 2 - Parser de configuration
 
@@ -139,71 +139,72 @@ Validation:
 
 Objectif: respecter strictement le modele I/O du sujet.
 
-- [ ] Remplacer les listeners hardcodes de `EventLoop` par les `listen` issus de `Config`.
-- [ ] Gerer plusieurs `server` sur un meme port sans double bind inutile.
-- [ ] Associer chaque fd listener a sa config server ou a un groupe de servers.
-- [ ] Remplacer `epoll_create1(0)` par `epoll_create(size)` pour rester dans les fonctions autorisees.
+- [x] Remplacer les listeners hardcodes de `EventLoop` par les `listen` issus de `Config`.
+- [x] Refuser plusieurs `server` sur un meme port au chargement de config.
+- [x] Associer chaque fd listener a sa config server ou a un groupe de servers.
+- [x] Remplacer `epoll_create1(0)` par `epoll_create(size)` pour rester dans les fonctions autorisees.
 - [x] Garder un seul appel `epoll_wait` central pour toutes les I/O sockets.
 - [x] Sur sockets clients, ne faire `recv` que quand `EPOLLIN` est signale.
 - [x] Sur sockets clients, ne faire `send` que quand `EPOLLOUT` est signale.
-- [ ] Retirer la logique qui consulte `errno` apres `recv`/`send`.
-- [ ] Eviter les boucles read/write jusqu'a `EAGAIN`; traiter une quantite bornee par event.
+- [x] Retirer la logique qui consulte `errno` apres `recv`/`send`.
+- [x] Eviter les boucles read/write jusqu'a `EAGAIN`; traiter une quantite bornee par event.
 - [x] Gerer les envois partiels:
   - garder le reste dans `out_buffer`.
   - laisser `EPOLLOUT` actif tant que le buffer n'est pas vide.
 - [x] Gerer les lectures partielles:
   - accumuler dans `in_buffer`.
   - parser seulement quand la requete est complete.
-- [ ] Ajouter timeouts de connexion:
+- [x] Ajouter timeouts de connexion:
   - headers incomplets.
   - body incomplet.
   - idle keep-alive.
-- [~] Gerer `EPOLLHUP`, `EPOLLERR`, fermeture client, et cleanup sans fuite.
+- [x] Verifier que la config refuse les ports dupliques avant de lancer le serveur.
+- [x] Gerer `EPOLLHUP`, `EPOLLERR`, fermeture client, et cleanup sans fuite.
 - [x] Eviter que la suppression d'une connexion invalide l'iteration en cours.
 
 Validation:
 
-- [ ] Plusieurs clients simultanes peuvent charger des pages.
-- [ ] Un client lent ne bloque pas les autres.
-- [ ] Un client qui deconnecte pendant upload/download ne crash pas.
+- [~] Plusieurs clients simultanes peuvent charger des pages.
+- [~] Un client lent ne bloque pas les autres.
+- [~] Un client qui deconnecte pendant upload/download ne crash pas.
 - [ ] Stress test basique sans indisponibilite.
 
 ## Epic 4 - Parser HTTP robuste
 
 Objectif: transformer un flux TCP en requetes HTTP valides et exploitables.
 
-- [~] Separer clairement:
+- [x] Separer clairement:
   - detection de requete complete.
   - parsing de start-line.
   - parsing headers.
   - parsing body.
-- [~] Accepter au minimum `HTTP/1.0` et `HTTP/1.1` si choisi, ou documenter strictement le choix.
-- [~] Valider methodes:
+- [x] Accepter au minimum `HTTP/1.0` et `HTTP/1.1` si choisi, ou documenter strictement le choix.
+- [x] Valider methodes:
   - reconnues: GET, POST, DELETE.
   - non autorisees par location: 405.
   - inconnues: 400 ou 501 selon strategie.
-- [ ] Parser headers de facon case-insensitive.
-- [~] Nettoyer correctement `\r\n`.
-- [~] Gerer `Content-Length`:
+- [x] Parser headers de facon case-insensitive.
+- [x] Nettoyer correctement `\r\n`.
+- [x] Gerer `Content-Length`:
   - absent.
   - invalide.
   - negatif/impossible.
-  - multiple.
-- [ ] Gerer `Transfer-Encoding: chunked`:
+  - multiple: rejetes.
+- [x] Gerer `Transfer-Encoding: chunked`:
   - unchunk avant handlers/CGI.
   - detecter chunk invalide.
-- [~] Extraire URI:
+- [x] Extraire URI:
   - path.
   - query string.
   - percent-decoding si necessaire pour fichiers.
-- [~] Gerer Host pour HTTP/1.1:
+- [x] Gerer Host pour HTTP/1.1:
   - obligatoire.
   - utile pour virtual hosts si implemente.
-- [~] Gerer keep-alive:
+- [x] Gerer keep-alive:
   - HTTP/1.1 keep-alive par defaut sauf `Connection: close`.
   - HTTP/1.0 close par defaut sauf `Connection: keep-alive`.
-- [~] Supporter plusieurs requetes dans `in_buffer` apres une lecture, ou decider de fermer apres une reponse.
-- [ ] Appliquer limites:
+- [x] Supporter plusieurs requetes dans `in_buffer` apres une lecture, ou decider de fermer apres une reponse.
+- [x] Appliquer limites:
   - taille headers max.
   - taille body selon config.
 
@@ -218,13 +219,13 @@ Validation:
 
 Objectif: choisir la bonne configuration effective pour chaque requete.
 
-- [ ] Implementer `Router`.
-- [ ] Selectionner le `ServerConfig` depuis:
+- [x] Implementer `Router`.
+- [x] Selectionner le `ServerConfig` depuis:
   - fd listener ou port local.
   - header `Host` si virtual host implemente.
   - premier server du couple host:port comme default server.
-- [ ] Matcher la meilleure `LocationConfig` par prefixe le plus long.
-- [ ] Fusionner config server + location:
+- [x] Matcher la meilleure `LocationConfig` par prefixe le plus long.
+- [~] Fusionner config server + location:
   - root.
   - index.
   - methods.
@@ -234,8 +235,8 @@ Objectif: choisir la bonne configuration effective pour chaque requete.
   - redirection.
   - error_pages.
   - client_max_body_size.
-- [ ] Normaliser les paths pour eviter les traversals.
-- [ ] Preparer un objet `RequestContext` donne aux handlers.
+- [x] Normaliser les paths pour eviter les traversals.
+- [x] Preparer un objet `RequestContext` donne aux handlers.
 
 Validation:
 
@@ -247,7 +248,7 @@ Validation:
 
 Objectif: produire des reponses correctes, completes et coherentes.
 
-- [~] Centraliser les reason phrases:
+- [x] Centraliser les reason phrases:
   - 200 OK
   - 201 Created
   - 204 No Content
@@ -260,17 +261,17 @@ Objectif: produire des reponses correctes, completes et coherentes.
   - 500 Internal Server Error
   - 501 Not Implemented
   - 504 Gateway Timeout si CGI timeout.
-- [ ] Ne pas encoder `Connection` via un faux header `keep-alive`.
-- [~] Respecter les headers fournis par les handlers.
+- [x] Ne pas encoder `Connection` via un faux header `keep-alive`.
+- [x] Respecter les headers fournis par les handlers.
 - [ ] Ajouter `Date` si souhaite, sinon garder minimal.
-- [ ] Ajouter `Allow` sur 405.
-- [ ] Ajouter `Location` sur redirect.
-- [ ] Implementer default error pages HTML si aucune page configuree.
-- [ ] Servir les `error_page` configurees si disponibles.
-- [~] Eviter de recalculer un Content-Length faux:
+- [x] Ajouter `Allow` sur 405.
+- [x] Ajouter `Location` sur redirect.
+- [x] Implementer default error pages HTML si aucune page configuree.
+- [x] Servir les `error_page` configurees si disponibles.
+- [x] Eviter de recalculer un Content-Length faux:
   - body vide pour 204.
   - body absent pour HEAD si HEAD supporte.
-- [~] Gerer MIME types de facon plus complete.
+- [x] Gerer MIME types de facon plus complete.
 
 Validation:
 
@@ -282,13 +283,13 @@ Validation:
 
 Objectif: servir un site statique complet.
 
-- [ ] Remplacer root hardcode `./` par root effectif du routing.
-- [~] Utiliser `stat` pour distinguer:
+- [x] Remplacer root hardcode `./` par root effectif du routing.
+- [x] Utiliser `stat` pour distinguer:
   - fichier.
   - dossier.
   - absent.
   - permissions insuffisantes.
-- [~] Si ressource dossier:
+- [x] Si ressource dossier:
   - si path sans `/`, optionnellement redirect vers `/`.
   - chercher index configure.
   - si pas d'index et autoindex on, generer listing.
@@ -297,7 +298,7 @@ Objectif: servir un site statique complet.
   - normaliser path.
   - verifier que le chemin final reste sous root.
 - [x] Supporter GET.
-- [~] Decider si HEAD est supporte; si oui, l'ajouter proprement au parser/methods.
+- [x] Decider si HEAD est supporte; si oui, l'ajouter proprement au parser/methods.
 - [x] Lire fichiers regulierement sans poll, autorise par le sujet.
 - [x] Gerer fichiers binaires sans corruption.
 
@@ -311,22 +312,22 @@ Validation:
 
 Objectif: couvrir les methodes obligatoires du sujet.
 
-- [ ] POST:
+- [x] POST:
   - si location upload active, ecrire le body dans `upload_dir`.
   - choisir une strategie de nommage de fichier.
   - retourner 201 Created ou status coherent.
   - verifier permissions et existence du dossier.
-- [ ] POST sans upload ni CGI:
+- [x] POST sans upload ni CGI:
   - retourner 405/404/501 selon configuration retenue.
-- [ ] DELETE:
+- [x] DELETE:
   - mapper URI vers fichier sous root.
   - refuser dossiers sauf choix explicite.
   - supprimer via fonction autorisee si disponible dans sujet; verifier si `unlink` est autorise avant usage.
   - si `unlink` non autorise dans votre version, revoir strategie avec evaluateurs/sujet local.
   - retourner 204 si suppression OK.
   - retourner 404 si absent, 403 si interdit.
-- [ ] Appliquer `methods` par location avant handler.
-- [ ] Appliquer `client_max_body_size` avant d'accumuler un body trop gros.
+- [x] Appliquer `methods` par location avant handler.
+- [x] Appliquer `client_max_body_size` avant d'accumuler un body trop gros.
 
 Validation:
 

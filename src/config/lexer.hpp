@@ -27,7 +27,7 @@ struct Token {
 class Lexer
 {
 public:
-	Lexer(const char *input);
+	explicit Lexer(const char *input);
 	void readFile(const char *filename);
 	Token getNextToken();
 	Token handleString();
