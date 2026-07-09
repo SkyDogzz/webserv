@@ -2,6 +2,7 @@
 #define CONFIG_HPP
 
 #include "ServerConfig.hpp"
+#include "../../src/config/JsonValue.hpp"
 #include <vector>
 
 /*
@@ -20,9 +21,7 @@
 
 class Config {
 public:
-    explicit Config(const std::string& filename);
-
-    void validate() const;
+    Config(JsonValue *ObjConfig);
 
     std::vector<ServerConfig> servers;
 };

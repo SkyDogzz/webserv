@@ -4,6 +4,12 @@
 JsonValue::JsonValue() : _type(JSON_NULL), _boolVal(false), _numberVal(0), 
 			_stringVal(NULL), _arrayVal(NULL), _objectVal(NULL) {}
 
+JsonValue::JsonValue(JsonType t) : _type(t), _boolVal(false), _numberVal(0), 
+			_stringVal(NULL), _arrayVal(NULL), _objectVal(NULL) {
+	if (t == JSON_ARRAY) _arrayVal = new std::vector<JsonValue*>();
+	if (t == JSON_OBJET) _objectVal = new std::map<std::string, JsonValue*>();
+}
+
 JsonValue::JsonValue(const std::string &s) : _type(JSON_STRING), _boolVal(false), _numberVal(0),
 						_arrayVal(NULL), _objectVal(NULL) {
 	_stringVal = new std::string(s);
@@ -63,6 +69,39 @@ void	JsonValue::addObjetMember(const std::string &key, JsonValue *val)
 	(*_objectVal)[key] = val;
 }
 
+JsonType JsonValue::getType() const {
+	return _type;
+}
+
+bool JsonValue::asBool() const {
+	return _boolVal;
+}
+
+double JsonValue::asNumber() const {
+	return _numberVal;
+}
+
+const std::string &JsonValue::asString() const {
+	static const std::string empty = "";
+	if (_stringVal)
+		return *_stringVal;
+	return empty;
+}
+
+const std::vector<JsonValue*> &JsonValue::asArray() const {
+	static const std::vector<JsonValue*> empty;
+	if (_arrayVal)
+		return *_arrayVal;
+	return empty;
+}
+
+const std::map<std::string, JsonValue*> &JsonValue::asObject() const {
+	static const std::map<std::string, JsonValue*> empty;
+	if (_objectVal)
+		return *_objectVal;
+	return empty;
+}
+
 void	JsonValue::print(int indent) const {
 	std::string spaces(indent, ' ');
     switch (_type) {
@@ -93,4 +132,14 @@ void	JsonValue::print(int indent) const {
             std::cout << spaces << "}";
             break;
     }
+}
+
+bool JsonValue::isValid(const JsonValue *val) {
+	if (!val)
+		return false;
+	if (val->getType() == JSON_OBJET) {
+		const std::map<std::string, JsonValue*> &obj = val->asObject();
+		if (obj.empty()) return false;
+	}
+	return true;
 }

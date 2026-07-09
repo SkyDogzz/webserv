@@ -3,6 +3,7 @@
 
 #include "../config/Config.hpp"
 #include "../network/EventLoop.hpp"
+#include "../../src/config/JsonValue.hpp"
 
 /*
     WebServer
@@ -38,6 +39,8 @@ public:
     void appliConfig(Config& config);
     const Config* getConfig() const;
     void run();
+    bool isRunning();
+    Config* _config;
     bool isRunning() const;
 };
 

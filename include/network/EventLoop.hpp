@@ -17,6 +17,8 @@
     Purely I/O multiplexing.
 */
 
+class Config;
+
 class EventLoop {
 public:
     static void run(const Config& config);

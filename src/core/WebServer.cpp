@@ -10,14 +10,17 @@ void WebServer::sigintHandler(int signal)
 }
 
 WebServer::WebServer()
-    : _running(true)
-    , _config(NULL)
+    : _running(true), _config(NULL)
 {
     signal(SIGINT, &WebServer::sigintHandler);
     signal(SIGPIPE, SIG_IGN);
 }
 
-WebServer::~WebServer() { }
+WebServer::~WebServer() {
+    if (_config) {
+        delete _config;
+    }
+}
 
 WebServer& WebServer::getInstance()
 {

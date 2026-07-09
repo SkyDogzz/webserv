@@ -22,7 +22,14 @@
 
 class ServerConfig {
 public:
-    ServerConfig();
+    ServerConfig()
+        : host("0.0.0.0")
+        , port(80)
+        , server_name("")
+        , root("")
+        , index("")
+        , client_max_body_size(1048576) // 1MB default
+    {}
 
     std::string host;
     int         port;

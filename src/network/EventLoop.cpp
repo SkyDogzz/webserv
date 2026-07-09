@@ -628,15 +628,31 @@ static void closeConnection(int epfd, std::map<int, Connection>& conns, int fd)
         conns.erase(it);
 }
 
-void EventLoop::run(const Config& config)
+void EventLoop::run(Config* config)
 {
-    if (config.servers.empty()) {
+    if (!config) {
+        std::cerr << "No configuration provided to EventLoop" << std::endl;
+        return;
+    }
+
+    std::vector<ListeningSocket> listens;
+    for (size_t i = 0; i < config->servers.size(); ++i) {
+        std::ostringstream oss;
+        oss << config->servers[i].port;
+        listens.push_back(ListeningSocket(config->servers[i].host, oss.str(), 128));
+    }
+
+    if (listens.empty()) {
         std::cerr << "No servers configured" << std::endl;
         return;
     }
 
     std::vector<ListeningSocket> listens(config.servers.size());
     std::map<int, size_t> listen_map;
+    for (size_t i = 0; i < listens.size(); ++i) {
+        if (listens[i].getFd() == -1) {
+            std::cerr << "Failed to open listening socket on port " << listens[i].getPort() << std::endl;
+            continue;
     for (size_t i = 0; i < config.servers.size(); ++i) {
         const ServerConfig& server = config.servers[i];
         std::ostringstream port;
@@ -650,14 +666,21 @@ void EventLoop::run(const Config& config)
         listen_map[listens[i].getFd()] = i;
     }
 
+    if (listen_map.empty()) {
+        std::cerr << "No listening sockets could be opened" << std::endl;
+        return;
+    }
+
+    int epfd = epoll_create1(0);
     int epfd = epoll_create(1);
     if (epfd == -1) {
         std::cerr << "epoll_create failed: " << std::strerror(errno) << std::endl;
         return;
     }
 
-    for (size_t i = 0; i < listens.size(); ++i)
-        listens[i].addToEpoll(epfd);
+    for (std::map<int, size_t>::iterator it = listen_map.begin(); it != listen_map.end(); ++it) {
+        listens[it->second].addToEpoll(epfd);
+    }
 
     std::map<int, Connection> conns;
     std::map<int, CgiJobEntry> cgi_jobs;
@@ -782,9 +805,50 @@ void EventLoop::run(const Config& config)
                     continue;
                 }
 
-                if (peer_closed && !conn.wantsWrite()) {
-                    closeConnection(epfd, conns, fd);
-                    continue;
+                    bool keep_alive = false;
+                    std::cout << "ok = " << ok << std::endl;
+                    if (ok) {
+                        std::map<std::string, std::string>::iterator hit = request.headers.find("Connection");
+                        if (hit != request.headers.end()) {
+                            keep_alive = (hit->second == "keep-alive");
+                        } else {
+                            keep_alive = (request.version == "HTTP/1.1");
+                        }
+                    }
+                    conn.setKeepAlive(keep_alive);
+                    if (!keep_alive)
+                        conn.markCloseAfterWrite();
+
+                    if (!ok)
+                        conn.out_buffer = buildSimpleResponse(400, "Bad Request", keep_alive);
+                    else {
+                        int listen_fd = conn.getListenFd();
+                        size_t srv_idx = listen_map[listen_fd];
+                        const ServerConfig& srv_cfg = config->servers[srv_idx];
+                        
+                        // Find the best matching location (longest prefix)
+                        const LocationConfig* best_loc = NULL;
+                        for (size_t j = 0; j < srv_cfg.locations.size(); ++j) {
+                            if (request.path.find(srv_cfg.locations[j].path) == 0) {
+                                if (!best_loc || srv_cfg.locations[j].path.length() > best_loc->path.length()) {
+                                    best_loc = &srv_cfg.locations[j];
+                                }
+                            }
+                        }
+
+                        std::string root = srv_cfg.root;
+                        if (best_loc && !best_loc->root.empty()) {
+                            root = best_loc->root;
+                        }
+                        if (root.empty()) {
+                            root = "./";
+                        }
+
+                        StaticHandler staticHandler(root);
+                        HttpResponse response = staticHandler.handle(request);
+                        conn.out_buffer = response.toString();
+                    }
+                    conn.modEpoll(epfd, true);
                 }
                 conn.modEpoll(epfd, conn.wantsWrite());
             }
