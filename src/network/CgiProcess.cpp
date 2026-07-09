@@ -2,6 +2,7 @@
 
 #include "../../include/http/HttpStatus.hpp"
 #include "../../include/utils/Utils.hpp"
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -278,6 +279,16 @@ bool CgiProcess::onWritable()
             closeInput();
         return true;
     }
+
+    if (written == -1 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
+        return true;
+
+    if (written == -1 && errno == EPIPE) {
+        failed_ = true;
+        closeInput();
+        return false;
+    }
+
     return true;
 }
 

@@ -706,13 +706,18 @@ void EventLoop::run(const Config& config)
                 Connection& conn = conn_it->second;
                 CgiProcess& process = job_it->second.process;
 
-                if (events[i].events & (EPOLLHUP | EPOLLERR)) {
+                if (events[i].events & EPOLLERR) {
                     finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
                     conn.modEpoll(epfd, conn.wantsWrite());
                     continue;
                 }
 
                 if (fd == process.getWriteFd()) {
+                    if (events[i].events & EPOLLHUP) {
+                        finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
+                        conn.modEpoll(epfd, conn.wantsWrite());
+                        continue;
+                    }
                     if (!process.onWritable()) {
                         finalizeCgiJob(epfd, conns, cgi_jobs, cgi_fd_owner, conn_fd, 500);
                         conn.modEpoll(epfd, conn.wantsWrite());
